@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Lux Hotel 1</title>
+	<!-- fontawesome -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+		crossorigin="anonymous" referrerpolicy="no-referrer" />
+	<!-- bootstrap  -->
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+		integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+	<!-- embed font -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+		rel="stylesheet">
+	<!-- style -->
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+	<header>
+		<div class="top-header">
+			<div class="container-md">
+				<div class="row">
+					<div class="col-2">
+						<div class="phone-head">
+							<i class="fa fa-phone" aria-hidden="true"></i>
+							<span>1 877 834 245</span>
+						</div>
+					</div>
+
+					<div class="col-2">
+						<i class="fa fa-map-marker" aria-hidden="true"></i>
+						<span> Amelia Island, Panama</span>
+					</div>
+					<div class="col-md-8">
+						<p class="icon">
+							<i class="fa fa-facebook" aria-hidden="true"></i>
+							<i class="fa fa-globe" aria-hidden="true"></i>
+							<i class="fa fa-google-plus" aria-hidden="true"></i>
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="logo-nav">
+			<div class="logo">
+				<a href=""><img src="./images/logo.png"></a>
+			</div>
+			<span class="menu-bar"><i class="fa fa-bars" aria-hidden="true"></i></span>
+			<div class="menu">
+				<nav>
+					<ul class="primary-menu">
+						<li class="current-item"><a href="">Home</a></li>
+						<li class="has-child">
+							<a href="">Room</a>
+							<ul class="sub-menu">
+								<li><a href="">Room Booking List</a></li>
+								<li><a href="">Room Card</a></li>
+								<li><a href="">Room Carousel</a></li>
+								<li><a href="">Room Single</a></li>
+							</ul>
+							<span class="drop-down" onclick="dropdown(this)"><i class="fa fa-angle-down"
+									aria-hidden="true"></i></span>
+							<span class="up inactive" onclick="up(this)"><i class="fa fa-angle-up"
+									aria-hidden="true"></i></span>
+						</li>
+						<li><a href="">Elements</a></li>
+						<li><a href="">Pages</a></li>
+						<li><a href="">Blog</a></li>
+						<li><a href="">Contact</a></li>
+					</ul>
+				</nav>
+			</div>
+		</div>
+
+	</header>
+	<main>
+		<!-- slider -->
+		<div class="slider">
+			<div class="slider-img">
+				<img src="./Images/Slider 1.jpg" id="slider" alt="">
+				<div class="content-slider1">
+					<div class="container">
+						<div class="row">
+							<div class="col-md-6">
+								<div class="slider-info">
+									<h1 id="titleSlider">Luxury Times.</h1>
+									<h1>Bay & Beyond.</h1>
+									<p>The finest hotel near Panama Beach</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="slider1-button">
+					<span><i class="fa fa-angle-left" aria-hidden="true" onclick="prev()"></i></span>
+					<span><i class="fa fa-angle-right" aria-hidden="true" onclick="next()"></i></span>
+				</div>
+			</div>
+			<div class="container">
+				<div class="row">
+					<div class="col-md-6 offset-md-6">
+						<div class="form-slider">
+							<form action="" id="check-form">
+								<div class="row">
+									<div class="col-6">
+										<label for="arrivalDate">Arrival Date</label>
+										<input type="date" id="arrivalDate" name="arrivalDate"
+											placeholder="Arrival Date">
+										<div class="alert alert-danger hidden-message " role="alert"
+											id="arrivalDateError">
+											You must enter your arrival date!
+										</div>
+
+									</div>
+									<div class="col-6">
+										<label for="departureDate">Departure Date</label>
+										<input type="date" id="departureDate" name="departureDate"
+											placeholder="Departure Date">
+										<div class="alert alert-danger hidden-message" role="alert"
+											id="departureDateError">
+											You must enter your departure date!
+										</div>
+									</div>
+								</div>
+								<div class="row">
+									<div class="col-6">
+										<label for="adult">Adult</label>
+										<select id="adult" name="adult">
+											<option value="adult" selected>Adult</option>
+											<option value="elder">Elder</option>
+											<option value="others">Others</option>
+										</select>
+
+									</div>
+									<div class="col-6">
+										<label for="children">Children</label>
+										<select id="children" name="children">
+											<option value="children" selected>Children</option>
+											<option value="elder2">Elder</option>
+											<option value="others2">Others</option>
+										</select>
+									</div>
+								</div>
+								<button type="submit">CHECK AVAILABILITY</button>
+							</form>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- b1 -->
+		<section class="intro-section">
+			<div class="container-md">
+				<div class="row">
+					<div class="col-md-4">
+						<p class="info">AMELIA ISLAND, PANAMA</p>
+						<h1>Panama's Fitnest Hotel. Make Your Golden Memories.</h1>
+					</div>
+					<div class="col-md-4">
+						<img src="./images/Panama's Finist Hotel.jpg">
+					</div>
+					<div class="col-md-4">
+						<p>
+							Make memories at Hotel Luxe, Amelia Island, where southern charm, magnificent scenery
+							and
+							casually elegant surroundings exemplify the gentle ambience of this barrier island’s
+							luxury
+							beachfront resort.
+						</p>
+						<p>
+							Hotel Luxe is the perfect place to feed your spirit. With recently renovated rooms and a
+							bolder focus on cuisine culture & more.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+		<section class="accommodation">
+			<div class="container">
+				<p class="info">ACCOMMODATION & COMFORT</p>
+				<h1>Eco-Inspired Lodging</h1>
+				<div class="desktop">
+					<div class="row" id="accommodationFirst">
+					</div>
+				</div>
+				<div class="mobile">
+					<article class="accommodation-item">
+						<a href=""><img src="./Images/Room - Standard.jpg" alt=""></a>
+						<div class="content">
+							<a href="">
+								<h3>Standard Room</h3>
+							</a>
+							<p>Starting from $60.0/night</p>
+						</div>
+					</article>
+				</div>
+				<div class="slide-button">
+					<span><i class="fa fa-angle-left" aria-hidden="true" onclick="getPrevious()"></i></span>
+					<span><i class="fa fa-angle-right" aria-hidden="true" onclick="getNext()"></i></span>
+				</div>
+
+			</div>
+		</section>
+		<section class="slider-2">
+			<img src="./Images/Culinary Experience.jpg" id="slider-2" alt="">
+			<div class="overlay">
+			</div>
+			<div class="slider-content">
+				<div class="container-md">
+					<div class="row">
+						<div class="col-md-6">
+							<div id="culinary-spa">
+								<h1>Culinary Experience</h1>
+								<p>Whether you choose an intimate, inspired dinner at Junction or traditional pub fare
+									at
+									The
+									Tavern,
+									your taste buds will rejoice at how inventive and fresh our food is—many of our
+									ingredients
+									are
+									grown on-site in our organic garden.</p>
+							</div>
+							<button type="submit">BOOK NOW</button>
+							<div class="slide-button">
+								<span><i class="fa fa-angle-left" aria-hidden="true"
+										onclick="getPreviousSlider()"></i></span>
+								<span><i class="fa fa-angle-right" aria-hidden="true"
+										onclick="getNextSLider()"></i></span>
+							</div>
+						</div>
+
+					</div>
+				</div>
+			</div>
+		</section>
+		<section class="incentives">
+			<div class="container-md">
+				<p class="info">VACATION AT EASE</p>
+				<h1>Inspired Incentives</h1>
+				<div class="row" id="incentives">
+				</div>
+			</div>
+		</section>
+		<section class="people-say">
+			<div class="container-md">
+				<p class="info">PEOPLE LOVE OUR HOTEL</p>
+				<h1>What Others Say</h1>
+				<div class="row" id="people">
+				</div>
+			</div>
+		</section>
+		<section class="news">
+			<div class="container-md">
+				<p class="info">WHAT'S UP</p>
+				<h1>Articles & News</h1>
+				<div class="row" id="news">
+				</div>
+				<a href="">
+					<p class="view-more">VIEW MORE ARTICLES</p>
+				</a>
+
+			</div>
+		</section>
+	</main>
+	<footer>
+		<div class="top-footer">
+			<div class="container-md">
+				<div class="row">
+					<div class="col-md-3">
+						<a href=""><img src="./Images/logo.png" alt=""></a>
+						<p>Hotel Luxe is an all-in-one WordPress theme to make hotel websites of any kind. Make the
+							hotel
+							website you’ve always dreamt of with Hotel Luxe.</p>
+					</div>
+					<div class="col-md-3">
+						<h5>CONTACT US</h5>
+						<p><i class="fa fa-map-marker" aria-hidden="true"></i><span> </span>221 B, Baker Street, London
+						</p>
+						<p><i class="fa fa-phone" aria-hidden="true"></i><span> </span>+01-7458292</p>
+						<p><i class="fa fa-envelope" aria-hidden="true"></i><span> </span>example@gmail.com</p>
+					</div>
+					<div class="col-md-3">
+						<h5>QUICK LINKS</h5>
+						<nav>
+							<ul class="sec-menu">
+								<li><a href="">Home</a></li>
+								<li><a href="">Terms & Conditions</a></li>
+								<li><a href="">FAQ</a></li>
+								<li><a href="">Newsletter</a></li>
+							</ul>
+						</nav>
+					</div>
+					<div class="col-md-3">
+						<h5>DON'T MISS ANY UPDATES</h5>
+						<form action="" id="sign-in-form">
+							<input type="email" id="email" name="email" autocomplete="additional-name"
+								placeholder="Your email">
+							<div class="alert alert-danger hidden-message " role="alert" id="emailError">
+								You must enter your email!
+							</div>
+							<button type="submit">SIGN UP NOW</button>
+						</form>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="go-to-top"><i class="fa fa-angle-up" aria-hidden="true"></i></div>
+		<p class="bot-footer"> &copy; Built with pride and caffeine by ThemeBubble. All rights reserved. </p>
+	</footer>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+		integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+		crossorigin="anonymous"></script>
+	<script type="text/javascript" src="dom.js"></script>
+</body>
+
+</html>
