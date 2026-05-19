@@ -133,7 +133,16 @@ Các field Front-end đang dùng cần được giữ theo chuẩn camelCase khi
   "email": "example@gmail.com"
 }
 ```
+## Create backend structure
 
+```bash
+dotnet new sln -n LuxHotel
+dotnet new webapi -n LuxHotel.Api -o src/LuxHotel.Api
+dotnet new classlib -n LuxHotel.Domain -o src/LuxHotel.Domain
+dotnet new classlib -n LuxHotel.Application -o src/LuxHotel.Application
+dotnet new classlib -n LuxHotel.Infrastructure -o src/LuxHotel.Infrastructure
+dotnet new xunit -n LuxHotel.Tests -o tests/LuxHotel.Tests
+```
 ## Phân công công việc dự kiến
 
 | Vai trò | Nhiệm vụ chính |
