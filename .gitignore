@@ -1,0 +1,59 @@
+# Windows / macOS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editors / IDEs
+.vscode/
+.idea/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+logs/
+
+# Environment / secrets
+.env
+.env.*
+appsettings.Development.json
+appsettings.*.local.json
+
+# Node / frontend tooling
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+
+# ASP.NET / .NET
+bin/
+obj/
+TestResults/
+*.rsuser
+*.dbmdl
+*.jfm
+
+# NuGet
+*.nupkg
+packages/
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# Publish output
+publish/
+wwwroot/uploads/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+~$*
