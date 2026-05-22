@@ -90,6 +90,8 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+app.UseMiddleware<AntiXssMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -98,7 +100,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseMiddleware<AntiXssMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
