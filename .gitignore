@@ -3,6 +3,10 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# AI assistant context files (personal — not team docs)
+CLAUDE.md
+.claude/
+
 # Editors / IDEs
 .vscode/
 .idea/
