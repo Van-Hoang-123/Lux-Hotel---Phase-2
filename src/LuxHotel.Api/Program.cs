@@ -1,7 +1,10 @@
 using System.Text;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using LuxHotel.Application.Security.Interfaces;
 using LuxHotel.Application.Security.Services;
 using LuxHotel.Application.Security.Settings;
+using LuxHotel.Application.Validators;
 using LuxHotel.Infrastructure.Models.Context;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -43,6 +46,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
     options.AddPolicy("UserOnly", p => p.RequireRole("User"));
 });
+
+builder.Services.AddValidatorsFromAssemblyContaining<BookingValidator>();
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationClientsideAdapters();
 
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
