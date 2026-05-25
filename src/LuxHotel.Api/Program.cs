@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using LuxHotel.Infrastructure.Models.Context;
+using LuxHotel.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 

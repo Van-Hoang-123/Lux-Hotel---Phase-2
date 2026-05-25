@@ -1,8 +1,9 @@
 ﻿
+using LuxHotel.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 
-namespace LuxHotel.Infrastructure.Models.Context
+namespace LuxHotel.Infrastructure.Persistence
 {
     public class LuxHotelDbContext : DbContext
     {
@@ -10,6 +11,7 @@ namespace LuxHotel.Infrastructure.Models.Context
         public DbSet<Room> Rooms { get; set; }
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<Article> Articles { get; set; }
+        public DbSet<Payment> Payments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

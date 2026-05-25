@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LuxHotel.Infrastructure.Models
+namespace LuxHotel.Domain.Entities
 {
     [Table("Articles")]
     public class Article
