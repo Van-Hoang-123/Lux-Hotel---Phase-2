@@ -17,6 +17,12 @@ namespace LuxHotel.Infrastructure.Persistence
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<Room>()
+                .HasOne(room => room.CreatedByAdmin)
+                .WithMany(user => user.CreatedRooms)
+                .HasForeignKey(room => room.CreatedByAdminId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Bơm dữ liệu mẫu cho bảng Room theo đúng yêu cầu giao diện Front-end
             modelBuilder.Entity<Room>().HasData(
                 new Room { Id = 1, RoomType = "Standard Room", PricePerNight = 60.0m, ImageUrl = "./Images/Room - Standard.jpg", Description = "Phòng tiêu chuẩn", IsAvailable = true },
