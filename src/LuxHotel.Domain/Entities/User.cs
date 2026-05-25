@@ -20,5 +20,7 @@ namespace LuxHotel.Domain.Entities
 
         // THỂ HIỆN RELATIONSHIP: Một User có thể có nhiều đơn đặt phòng (Mối quan hệ 1 - Nhiều)
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+
+        public virtual ICollection<Room> CreatedRooms { get; set; } = new List<Room>();
     }
 }
