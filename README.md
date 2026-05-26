@@ -65,7 +65,7 @@ Example:
 }
 ```
 
-> To find your server name, open **SQL Server Management Studio (SSMS)** — the server name is shown on the login screen.
+> To find your server name, open **SQL Server Management Studio (SSMS)** — the server name appears on the login screen.
 
 ---
 
@@ -104,75 +104,23 @@ https://localhost:7210
 Swagger UI (for testing endpoints):
 
 ```
-https://localhost:7210/swagger
+https://localhost:5255/swagger
 ```
 
 ---
 
 ## 8. Run the Frontend
 
-### Option A — Live Server (recommended)
+### Live Server (recommended)
 
 1. Open the `frontend/` folder in **VS Code**.
 2. Install the **Live Server** extension if not already installed.
 3. Right-click `index.html` → select **"Open with Live Server"**.
 4. The site opens at `http://127.0.0.1:5500`.
 
-### Option B — Open directly in browser
-
-```bash
-# Windows
-start frontend/index.html
-
-# macOS
-open frontend/index.html
-```
-
-> **Note:** Opening via `file://` may cause CORS errors. Use Live Server to avoid this.
-
-### Configure API URL
-
-Open `frontend/dom.js` and make sure the base URL matches the running backend:
-
-```js
-const API_BASE = "http://localhost:5255/api";
-```
-
 ---
 
-## 9. CORS Configuration
-
-CORS is already configured in `src/LuxHotel.Api/Program.cs` — **no changes needed**.
-
-The project uses the `"AllowFrontend"` policy which accepts requests from any origin during development:
-
-```csharp
-// Register CORS policy (already in Program.cs)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend",
-        policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
-});
-
-// Applied in the middleware pipeline (already in Program.cs)
-app.UseCors("AllowFrontend"); // placed before UseAuthentication and MapControllers
-```
-
-> ⚠️ `AllowAnyOrigin()` is intentional for development. Before deploying to production, replace it with a specific origin:
-> ```csharp
-> policy.WithOrigins("https://your-production-domain.com")
->       .AllowAnyHeader()
->       .AllowAnyMethod();
-> ```
-
----
-
-## 10. API Endpoints
+## 9. API Endpoints
 
 ### Authentication
 
@@ -208,7 +156,7 @@ app.UseCors("AllowFrontend"); // placed before UseAuthentication and MapControll
 
 ---
 
-## 11. Example Request Bodies
+## 10. Example Request Bodies
 
 ### Check Availability
 
@@ -293,7 +241,7 @@ GET /api/rooms/{id}
 
 ```json
 {
-  "message": "Room with Id = 1 not found."
+  "message": "Không tìm thấy phòng nào có Id = 1."
 }
 ```
 
@@ -372,7 +320,7 @@ Authorization: Bearer <token>
 
 ---
 
-## 12. Technologies Used
+## 11. Technologies Used
 
 **Backend:** .NET 9, ASP.NET Core Web API, Entity Framework Core, SQL Server, JWT Authentication, Clean Architecture
 
@@ -380,82 +328,24 @@ Authorization: Bearer <token>
 
 ---
 
-## 13. Project Structure
+## 12. Project Structure
 
 ```text
 Lux-Hotel---Phase-2/
-├── .github/                         # GitHub Actions workflows
-├── docs/                            # Project documentation
-├── Lux Hotel 1/                     # Frontend — static site
-│   ├── Images/                      # Room and UI images
-│   ├── incentives/                  # Incentives section assets
-│   ├── dom.js                       # JavaScript — fetch API and render
-│   ├── index.html                   # Main page
-│   ├── index copy.html              # Backup / draft page
-│   ├── style.css                    # Global styles
-│   ├── Desktop UI.png               # UI reference — desktop
-│   ├── Desktop - Menu.jpg           # UI reference — menu
-│   ├── Mobile UI.png                # UI reference — mobile
-│   ├── Mobile - Menu.jpg            # UI reference — mobile menu
-│   └── Read me.docx                 # Original notes
-├── src/                             # Backend — Clean Architecture
-│   ├── LuxHotel.Api/                # Web API entry point
+├── src/
+│   ├── LuxHotel.Api/              # Web API entry point
 │   │   ├── Controllers/
-│   │   ├── Middleware/
 │   │   ├── Properties/
-│   │   │   └── launchSettings.json  # Ports: 5255 / 7210
+│   │   │   └── launchSettings.json
 │   │   ├── appsettings.json
-│   │   ├── appsettings.Development.json
 │   │   └── Program.cs
-│   ├── LuxHotel.Application/        # Business logic, DTOs, Validators
-│   ├── LuxHotel.Domain/             # Entities, Interfaces
-│   └── LuxHotel.Infrastructure/     # EF Core, DbContext, Migrations
-├── tests/                           # Unit and integration tests
-├── .gitignore
-├── AGENTS.md
-├── ERD.jpg                          # Entity Relationship Diagram
-├── LuxHotel.sln                     # Solution file
-├── README.md
-└── server.py                        # Dev utility script
+│   ├── LuxHotel.Application/      # Business logic, DTOs
+│   ├── LuxHotel.Domain/           # Entities, Interfaces
+│   └── LuxHotel.Infrastructure/   # EF Core, DbContext, Migrations
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   ├── dom.js
+│   └── Images/
+└── README.md
 ```
-
----
-
-## 14. Team Workflow — Syncing the Database
-
-When a team member creates a new Migration and pushes it to Git, all other members only need to follow these 3 steps:
-
-**Step 1 — Pull the latest code:**
-
-```bash
-git pull origin <shared-branch-name>
-```
-
-**Step 2 — Verify connection string** in `src/LuxHotel.Api/appsettings.Development.json` points to your local SQL Server.
-
-**Step 3 — Update your local database:**
-
-```bash
-dotnet ef database update --project src/LuxHotel.Infrastructure/ --startup-project src/LuxHotel.Api/
-```
-
-EF Core will automatically create the database if it does not exist, or upgrade the table structure if an older version is present — no manual `.sql` export/import needed.
-
-> ⚠️ The member who creates the Migration must commit the entire `Migrations/` folder to Git:
-> ```bash
-> git add src/LuxHotel.Infrastructure/Migrations/
-> git commit -m "Add migration: <migration-name>"
-> git push origin <branch-name>
-> ```
-
----
-
-## 15. Troubleshooting
-
-| Problem | Cause | Fix |
-| --- | --- | --- |
-| `dotnet ef` not found | EF tools not installed | Run `dotnet tool install --global dotnet-ef` |
-| Database connection error | Wrong server name | Double-check `DefaultConnection` in `appsettings.json` |
-| CORS error in browser | CORS not configured | Follow step 9 above |
-| Images not loading | Wrong path casing | Keep folder name as `Images/` (capital I) |
-| Swagger not opening | App not running | Make sure `dotnet run` completed without errors |
