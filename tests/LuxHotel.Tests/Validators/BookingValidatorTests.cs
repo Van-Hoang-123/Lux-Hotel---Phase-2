@@ -9,10 +9,11 @@ public class BookingValidatorTests
 
     private static BookingRequestDto ValidDto() => new()
     {
+        RoomId = 1,
         ArrivalDate = DateTime.UtcNow.Date.AddDays(1),
         DepartureDate = DateTime.UtcNow.Date.AddDays(3),
-        Adult = "2",
-        Children = "0"
+        Adult = 2,
+        Children = 0
     };
 
     [Fact]
@@ -20,6 +21,16 @@ public class BookingValidatorTests
     {
         var result = _sut.Validate(ValidDto());
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Invalid_room_id_fails()
+    {
+        var dto = ValidDto();
+        dto.RoomId = 0;
+        var result = _sut.Validate(dto);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.RoomId));
     }
 
     [Fact]
@@ -53,12 +64,10 @@ public class BookingValidatorTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("0")]
-    [InlineData("11")]
-    [InlineData("abc")]
-    [InlineData("-1")]
-    public void Invalid_adult_values_fail(string adult)
+    [InlineData(0)]
+    [InlineData(11)]
+    [InlineData(-1)]
+    public void Invalid_adult_values_fail(int adult)
     {
         var dto = ValidDto();
         dto.Adult = adult;
@@ -68,10 +77,10 @@ public class BookingValidatorTests
     }
 
     [Theory]
-    [InlineData("1")]
-    [InlineData("4")]
-    [InlineData("10")]
-    public void Adult_in_range_passes(string adult)
+    [InlineData(1)]
+    [InlineData(4)]
+    [InlineData(10)]
+    public void Adult_in_range_passes(int adult)
     {
         var dto = ValidDto();
         dto.Adult = adult;
@@ -80,11 +89,9 @@ public class BookingValidatorTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("11")]
-    [InlineData("abc")]
-    [InlineData("-1")]
-    public void Invalid_children_values_fail(string children)
+    [InlineData(11)]
+    [InlineData(-1)]
+    public void Invalid_children_values_fail(int children)
     {
         var dto = ValidDto();
         dto.Children = children;
@@ -94,10 +101,10 @@ public class BookingValidatorTests
     }
 
     [Theory]
-    [InlineData("0")]
-    [InlineData("3")]
-    [InlineData("10")]
-    public void Children_in_range_passes(string children)
+    [InlineData(0)]
+    [InlineData(3)]
+    [InlineData(10)]
+    public void Children_in_range_passes(int children)
     {
         var dto = ValidDto();
         dto.Children = children;

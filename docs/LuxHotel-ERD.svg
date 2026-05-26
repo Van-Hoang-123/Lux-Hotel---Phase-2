@@ -72,8 +72,9 @@
     <text class="cell" x="18" y="176">decimal</text><text class="cell" x="115" y="176">PricePerNight</text>
     <text class="cell" x="18" y="221">string</text><text class="cell" x="115" y="221">ImageUrl</text>
     <text class="cell" x="18" y="266">string</text><text class="cell" x="115" y="266">Description</text>
-    <text class="cell" x="18" y="311">bool</text><text class="cell" x="115" y="311">IsAvailable</text>
-    <text class="cell" x="18" y="356">Guid?</text><text class="cell" x="115" y="356">CreatedByAdminId</text><text class="key" x="307" y="356">FK</text>
+    <text class="cell" x="18" y="311">int</text><text class="cell" x="115" y="311">Capacity</text>
+    <text class="cell" x="18" y="356">bool</text><text class="cell" x="115" y="356">IsAvailable</text>
+    <text class="cell" x="18" y="401">Guid?</text><text class="cell" x="115" y="401">CreatedByAdminId</text><text class="key" x="307" y="401">FK</text>
   </g>
 
   <!-- Article -->
@@ -122,7 +123,7 @@
     <text class="cell" x="18" y="176">int</text><text class="cell" x="120" y="176">RoomId</text><text class="key" x="328" y="176">FK</text>
     <text class="cell" x="18" y="221">DateTime</text><text class="cell" x="120" y="221">ArrivalDate</text>
     <text class="cell" x="18" y="266">DateTime</text><text class="cell" x="120" y="266">DepartureDate</text>
-    <text class="cell" x="18" y="311">string</text><text class="cell" x="120" y="311">Adult / Children</text>
+    <text class="cell" x="18" y="311">int</text><text class="cell" x="120" y="311">Adult / Children</text>
     <text class="cell" x="18" y="356">decimal</text><text class="cell" x="120" y="356">TotalPrice</text>
     <text class="cell" x="18" y="396">string</text><text class="cell" x="120" y="396">BookingStatus</text>
   </g>
