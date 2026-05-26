@@ -1,32 +1,31 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-const rooms = [
-  {
-    title: "Standard Room",
-    image: "./Images/Room - Standard.jpg",
-    price: "From $60 / night",
-    copy: "Warm textures, soft linens, and a private corner for slower mornings.",
-  },
-  {
-    title: "Beach Villa",
-    image: "./Images/Room - Beach Villa.jpg",
-    price: "From $90 / night",
-    copy: "Steps from the shore with open-air lounging and quiet ocean light.",
-  },
-  {
-    title: "Exclusive Suite",
-    image: "./Images/Room - Exclusive Suite.jpg",
-    price: "From $120 / night",
-    copy: "A refined suite for longer stays, private dining, and terrace evenings.",
-  },
-  {
-    title: "Luxury Suite",
-    image: "./Images/Room - Luxury Suite.jpg",
-    price: "From $160 / night",
-    copy: "The signature stay: generous space, bay views, and personal service.",
-  },
-];
+const API_BASE_URL = "http://localhost:5255/api";
+
+let rooms = [];
+
+async function fetchRooms() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/rooms`);
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch rooms");
+    }
+
+    rooms = await response.json();
+
+    renderRooms();
+  } catch (error) {
+    console.error("Error fetching rooms:", error);
+
+    $("#roomsGrid").innerHTML = `
+      <p class="error-message">
+        Failed to load rooms from API.
+      </p>
+    `;
+  }
+}
 
 const experiences = [
   {
@@ -108,11 +107,22 @@ function renderRooms() {
     .map(
       (room) => `
         <article class="room-card">
-          <img src="${room.image}" alt="${room.title}" loading="lazy" />
+          <img 
+            src="${room.imageUrl}" 
+            alt="${room.name}" 
+            loading="lazy" 
+          />
+
           <div class="content">
-            <p class="price">${room.price}</p>
-            <h3>${room.title}</h3>
-            <p>${room.copy}</p>
+            <p class="price">
+              From $${room.price} / night
+            </p>
+
+            <h3>${room.name}</h3>
+
+            <p>
+              ${room.description}
+            </p>
           </div>
         </article>
       `
@@ -229,15 +239,57 @@ function showError(id, visible) {
 }
 
 function setupForms() {
-  $("#check-form").addEventListener("submit", (event) => {
-    const arrival = $("#arrivalDate").value;
-    const departure = $("#departureDate").value;
-    const missingArrival = !arrival;
-    const missingDeparture = !departure;
-    showError("#arrivalDateError", missingArrival);
-    showError("#departureDateError", missingDeparture);
-    if (missingArrival || missingDeparture) event.preventDefault();
-  });
+  $("#check-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const arrival = $("#arrivalDate").value;
+  const departure = $("#departureDate").value;
+  const adults = $("#adult").value;
+  const children = $("#children").value;
+
+  const missingArrival = !arrival;
+  const missingDeparture = !departure;
+
+  showError("#arrivalDateError", missingArrival);
+  showError("#departureDateError", missingDeparture);
+
+  if (missingArrival || missingDeparture) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/bookings/check-availability`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          arrivalDate: arrival,
+          departureDate: departure,
+          adults: parseInt(adults),
+          children: parseInt(children),
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "Booking failed");
+      return;
+    }
+
+    alert(data.message);
+
+    console.log("Booking response:", data);
+  } catch (error) {
+    console.error("Booking API error:", error);
+
+    alert("Cannot connect to booking API.");
+  }
+});
 
   $("#sign-in-form").addEventListener("submit", (event) => {
     const email = $("#email").value.trim();

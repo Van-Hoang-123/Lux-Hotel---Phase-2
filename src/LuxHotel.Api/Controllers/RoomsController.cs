@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using LuxHotel.Infrastructure.Persistence;
 
 namespace LuxHotel.Api.Controllers
@@ -14,6 +15,13 @@ namespace LuxHotel.Api.Controllers
         {
             _context = context;
             _env = env;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllRooms()
+        {
+            var rooms = await _context.Rooms.ToListAsync();
+            return Ok(rooms);
         }
 
         [HttpGet("{id}")] // Test Get Book By Id
