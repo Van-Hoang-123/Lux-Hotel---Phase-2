@@ -1,8 +1,9 @@
 ﻿
+using LuxHotel.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 
-namespace LuxHotel.Infrastructure.Models.Context
+namespace LuxHotel.Infrastructure.Persistence
 {
     public class LuxHotelDbContext : DbContext
     {
@@ -10,10 +11,17 @@ namespace LuxHotel.Infrastructure.Models.Context
         public DbSet<Room> Rooms { get; set; }
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<Article> Articles { get; set; }
+        public DbSet<Payment> Payments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Room>()
+                .HasOne(room => room.CreatedByAdmin)
+                .WithMany(user => user.CreatedRooms)
+                .HasForeignKey(room => room.CreatedByAdminId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Bơm dữ liệu mẫu cho bảng Room theo đúng yêu cầu giao diện Front-end
             modelBuilder.Entity<Room>().HasData(

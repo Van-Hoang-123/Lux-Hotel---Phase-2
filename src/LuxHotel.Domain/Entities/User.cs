@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LuxHotel.Infrastructure.Models
+namespace LuxHotel.Domain.Entities
 {
     public class User : IdentityUser<Guid>
     {
@@ -20,5 +20,7 @@ namespace LuxHotel.Infrastructure.Models
 
         // THỂ HIỆN RELATIONSHIP: Một User có thể có nhiều đơn đặt phòng (Mối quan hệ 1 - Nhiều)
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+
+        public virtual ICollection<Room> CreatedRooms { get; set; } = new List<Room>();
     }
 }

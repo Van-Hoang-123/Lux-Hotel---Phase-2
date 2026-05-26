@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LuxHotel.Infrastructure.Models
+namespace LuxHotel.Domain.Entities
 {
     [Table("Bookings")]
     public class Booking
@@ -56,5 +56,7 @@ namespace LuxHotel.Infrastructure.Models
 
         [ForeignKey("RoomId")] // Khai báo RoomId là khóa ngoại liên kết bảng Rooms
         public virtual Room Room { get; set; }
+
+        public virtual Payment? Payment { get; set; }
     }
 }

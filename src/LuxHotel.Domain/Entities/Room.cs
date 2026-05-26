@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LuxHotel.Infrastructure.Models
+namespace LuxHotel.Domain.Entities
 {
     [Table("Rooms")]
     public class Room
@@ -30,6 +30,11 @@ namespace LuxHotel.Infrastructure.Models
         public string Description { get; set; }
 
         public bool IsAvailable { get; set; } = true;
+
+        public Guid? CreatedByAdminId { get; set; }
+
+        [ForeignKey("CreatedByAdminId")]
+        public virtual User? CreatedByAdmin { get; set; }
 
         // THỂ HIỆN RELATIONSHIP: Một phòng có thể nằm trong nhiều đơn đặt (Mối quan hệ 1 - Nhiều)
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxHotel.Infrastructure.Migrations
 {
     [DbContext(typeof(LuxHotelDbContext))]
-    [Migration("20260522020854_SeedRoomData")]
-    partial class SeedRoomData
+    [Migration("20260525065353_AddRoomCreatedByAdmin")]
+    partial class AddRoomCreatedByAdmin
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,7 +25,7 @@ namespace LuxHotel.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.Article", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Article", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -65,7 +65,7 @@ namespace LuxHotel.Infrastructure.Migrations
                     b.ToTable("Articles");
                 });
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.Booking", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -113,13 +113,56 @@ namespace LuxHotel.Infrastructure.Migrations
                     b.ToTable("Bookings");
                 });
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.Room", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("TransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Room", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<Guid?>("CreatedByAdminId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -143,6 +186,8 @@ namespace LuxHotel.Infrastructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByAdminId");
 
                     b.ToTable("Rooms");
 
@@ -185,7 +230,7 @@ namespace LuxHotel.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.User", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -248,15 +293,15 @@ namespace LuxHotel.Infrastructure.Migrations
                     b.ToTable("User");
                 });
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.Booking", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Booking", b =>
                 {
-                    b.HasOne("LuxHotel.Infrastructure.Models.Room", "Room")
+                    b.HasOne("LuxHotel.Domain.Entities.Room", "Room")
                         .WithMany("Bookings")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LuxHotel.Infrastructure.Models.User", "User")
+                    b.HasOne("LuxHotel.Domain.Entities.User", "User")
                         .WithMany("Bookings")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -267,14 +312,42 @@ namespace LuxHotel.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.Room", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("LuxHotel.Domain.Entities.Booking", "Booking")
+                        .WithOne("Payment")
+                        .HasForeignKey("LuxHotel.Domain.Entities.Payment", "BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Room", b =>
+                {
+                    b.HasOne("LuxHotel.Domain.Entities.User", "CreatedByAdmin")
+                        .WithMany("CreatedRooms")
+                        .HasForeignKey("CreatedByAdminId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByAdmin");
+                });
+
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Booking", b =>
+                {
+                    b.Navigation("Payment");
+                });
+
+            modelBuilder.Entity("LuxHotel.Domain.Entities.Room", b =>
                 {
                     b.Navigation("Bookings");
                 });
 
-            modelBuilder.Entity("LuxHotel.Infrastructure.Models.User", b =>
+            modelBuilder.Entity("LuxHotel.Domain.Entities.User", b =>
                 {
                     b.Navigation("Bookings");
+
+                    b.Navigation("CreatedRooms");
                 });
 #pragma warning restore 612, 618
         }

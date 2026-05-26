@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using LuxHotel.Infrastructure.Models.Context;
+using LuxHotel.Infrastructure.Persistence;
 
 namespace LuxHotel.Api.Controllers
 {

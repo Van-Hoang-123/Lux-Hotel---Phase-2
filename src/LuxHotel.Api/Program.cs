@@ -6,7 +6,7 @@ using LuxHotel.Application.Security.Interfaces;
 using LuxHotel.Application.Security.Services;
 using LuxHotel.Application.Security.Settings;
 using LuxHotel.Application.Validators;
-using LuxHotel.Infrastructure.Models.Context;
+using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;

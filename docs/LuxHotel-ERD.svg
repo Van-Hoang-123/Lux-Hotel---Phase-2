@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
+  <defs>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .table { fill: #fffefa; stroke: #6b5fb5; stroke-width: 2; rx: 10; }
+      .header { fill: #ece9ff; stroke: #6b5fb5; stroke-width: 2; }
+      .title { font: 700 22px Arial, sans-serif; fill: #202124; }
+      .cell { font: 18px Arial, sans-serif; fill: #2f3437; }
+      .key { font: 700 16px Arial, sans-serif; fill: #4f46a5; }
+      .row-alt { fill: #f2f0e8; }
+      .grid { stroke: #c6c2b9; stroke-width: 1.4; }
+      .rel { stroke: #202124; stroke-width: 2; fill: none; }
+      .rel-label { font: 22px Arial, sans-serif; fill: #111827; }
+      .cardinality { font: 24px Arial, sans-serif; fill: #111827; }
+      .note { font: 18px Arial, sans-serif; fill: #50555a; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1150"/>
+  <text x="800" y="46" text-anchor="middle" class="title" font-size="28">Lux Hotel ERD</text>
+  <text x="800" y="76" text-anchor="middle" class="note">Updated entities: Domain.Entities + Payment + Admin-created Rooms</text>
+
+  <!-- User -->
+  <g id="user" transform="translate(70 110)">
+    <rect class="table" width="330" height="390"/>
+    <rect class="header" width="330" height="55" rx="10"/>
+    <text x="165" y="36" text-anchor="middle" class="title">User</text>
+    <line class="grid" x1="85" y1="55" x2="85" y2="390"/>
+    <line class="grid" x1="245" y1="55" x2="245" y2="390"/>
+    <g>
+      <rect class="row-alt" x="0" y="100" width="330" height="45"/>
+      <rect class="row-alt" x="0" y="190" width="330" height="45"/>
+      <rect class="row-alt" x="0" y="280" width="330" height="45"/>
+      <line class="grid" x1="0" y1="100" x2="330" y2="100"/>
+      <line class="grid" x1="0" y1="145" x2="330" y2="145"/>
+      <line class="grid" x1="0" y1="190" x2="330" y2="190"/>
+      <line class="grid" x1="0" y1="235" x2="330" y2="235"/>
+      <line class="grid" x1="0" y1="280" x2="330" y2="280"/>
+      <line class="grid" x1="0" y1="325" x2="330" y2="325"/>
+    </g>
+    <text class="cell" x="18" y="86">Guid</text><text class="cell" x="105" y="86">Id</text><text class="key" x="270" y="86">PK</text>
+    <text class="cell" x="18" y="131">string</text><text class="cell" x="105" y="131">UserName</text>
+    <text class="cell" x="18" y="176">string</text><text class="cell" x="105" y="176">Email</text>
+    <text class="cell" x="18" y="221">string</text><text class="cell" x="105" y="221">PasswordHash</text>
+    <text class="cell" x="18" y="266">string</text><text class="cell" x="105" y="266">FullName</text>
+    <text class="cell" x="18" y="311">string</text><text class="cell" x="105" y="311">PhoneNumber</text>
+    <text class="cell" x="18" y="356">string</text><text class="cell" x="105" y="356">Role</text>
+  </g>
+
+  <!-- Room -->
+  <g id="room" transform="translate(620 110)">
+    <rect class="table" width="380" height="435"/>
+    <rect class="header" width="380" height="55" rx="10"/>
+    <text x="190" y="36" text-anchor="middle" class="title">Room</text>
+    <line class="grid" x1="95" y1="55" x2="95" y2="435"/>
+    <line class="grid" x1="280" y1="55" x2="280" y2="435"/>
+    <g>
+      <rect class="row-alt" x="0" y="100" width="380" height="45"/>
+      <rect class="row-alt" x="0" y="190" width="380" height="45"/>
+      <rect class="row-alt" x="0" y="280" width="380" height="45"/>
+      <rect class="row-alt" x="0" y="370" width="380" height="45"/>
+      <line class="grid" x1="0" y1="100" x2="380" y2="100"/>
+      <line class="grid" x1="0" y1="145" x2="380" y2="145"/>
+      <line class="grid" x1="0" y1="190" x2="380" y2="190"/>
+      <line class="grid" x1="0" y1="235" x2="380" y2="235"/>
+      <line class="grid" x1="0" y1="280" x2="380" y2="280"/>
+      <line class="grid" x1="0" y1="325" x2="380" y2="325"/>
+      <line class="grid" x1="0" y1="370" x2="380" y2="370"/>
+    </g>
+    <text class="cell" x="18" y="86">int</text><text class="cell" x="115" y="86">Id</text><text class="key" x="307" y="86">PK</text>
+    <text class="cell" x="18" y="131">string</text><text class="cell" x="115" y="131">RoomType</text>
+    <text class="cell" x="18" y="176">decimal</text><text class="cell" x="115" y="176">PricePerNight</text>
+    <text class="cell" x="18" y="221">string</text><text class="cell" x="115" y="221">ImageUrl</text>
+    <text class="cell" x="18" y="266">string</text><text class="cell" x="115" y="266">Description</text>
+    <text class="cell" x="18" y="311">bool</text><text class="cell" x="115" y="311">IsAvailable</text>
+    <text class="cell" x="18" y="356">Guid?</text><text class="cell" x="115" y="356">CreatedByAdminId</text><text class="key" x="307" y="356">FK</text>
+  </g>
+
+  <!-- Article -->
+  <g id="article" transform="translate(1160 115)">
+    <rect class="table" width="340" height="345"/>
+    <rect class="header" width="340" height="55" rx="10"/>
+    <text x="170" y="36" text-anchor="middle" class="title">Article</text>
+    <line class="grid" x1="100" y1="55" x2="100" y2="345"/>
+    <line class="grid" x1="250" y1="55" x2="250" y2="345"/>
+    <rect class="row-alt" x="0" y="100" width="340" height="45"/>
+    <rect class="row-alt" x="0" y="190" width="340" height="45"/>
+    <rect class="row-alt" x="0" y="280" width="340" height="45"/>
+    <line class="grid" x1="0" y1="100" x2="340" y2="100"/>
+    <line class="grid" x1="0" y1="145" x2="340" y2="145"/>
+    <line class="grid" x1="0" y1="190" x2="340" y2="190"/>
+    <line class="grid" x1="0" y1="235" x2="340" y2="235"/>
+    <line class="grid" x1="0" y1="280" x2="340" y2="280"/>
+    <text class="cell" x="18" y="86">int</text><text class="cell" x="120" y="86">Id</text><text class="key" x="275" y="86">PK</text>
+    <text class="cell" x="18" y="131">string</text><text class="cell" x="120" y="131">Title</text>
+    <text class="cell" x="18" y="176">string</text><text class="cell" x="120" y="176">Author</text>
+    <text class="cell" x="18" y="221">string</text><text class="cell" x="120" y="221">Category</text>
+    <text class="cell" x="18" y="266">string</text><text class="cell" x="120" y="266">Summary</text>
+    <text class="cell" x="18" y="311">DateTime</text><text class="cell" x="120" y="311">PublishedAt</text>
+  </g>
+
+  <!-- Booking -->
+  <g id="booking" transform="translate(520 670)">
+    <rect class="table" width="410" height="410"/>
+    <rect class="header" width="410" height="55" rx="10"/>
+    <text x="205" y="36" text-anchor="middle" class="title">Booking</text>
+    <line class="grid" x1="100" y1="55" x2="100" y2="410"/>
+    <line class="grid" x1="300" y1="55" x2="300" y2="410"/>
+    <rect class="row-alt" x="0" y="100" width="410" height="45"/>
+    <rect class="row-alt" x="0" y="190" width="410" height="45"/>
+    <rect class="row-alt" x="0" y="280" width="410" height="45"/>
+    <rect class="row-alt" x="0" y="370" width="410" height="40"/>
+    <line class="grid" x1="0" y1="100" x2="410" y2="100"/>
+    <line class="grid" x1="0" y1="145" x2="410" y2="145"/>
+    <line class="grid" x1="0" y1="190" x2="410" y2="190"/>
+    <line class="grid" x1="0" y1="235" x2="410" y2="235"/>
+    <line class="grid" x1="0" y1="280" x2="410" y2="280"/>
+    <line class="grid" x1="0" y1="325" x2="410" y2="325"/>
+    <line class="grid" x1="0" y1="370" x2="410" y2="370"/>
+    <text class="cell" x="18" y="86">Guid</text><text class="cell" x="120" y="86">Id</text><text class="key" x="328" y="86">PK</text>
+    <text class="cell" x="18" y="131">Guid</text><text class="cell" x="120" y="131">UserId</text><text class="key" x="328" y="131">FK</text>
+    <text class="cell" x="18" y="176">int</text><text class="cell" x="120" y="176">RoomId</text><text class="key" x="328" y="176">FK</text>
+    <text class="cell" x="18" y="221">DateTime</text><text class="cell" x="120" y="221">ArrivalDate</text>
+    <text class="cell" x="18" y="266">DateTime</text><text class="cell" x="120" y="266">DepartureDate</text>
+    <text class="cell" x="18" y="311">string</text><text class="cell" x="120" y="311">Adult / Children</text>
+    <text class="cell" x="18" y="356">decimal</text><text class="cell" x="120" y="356">TotalPrice</text>
+    <text class="cell" x="18" y="396">string</text><text class="cell" x="120" y="396">BookingStatus</text>
+  </g>
+
+  <!-- Payment -->
+  <g id="payment" transform="translate(1080 685)">
+    <rect class="table" width="390" height="345"/>
+    <rect class="header" width="390" height="55" rx="10"/>
+    <text x="195" y="36" text-anchor="middle" class="title">Payment</text>
+    <line class="grid" x1="100" y1="55" x2="100" y2="345"/>
+    <line class="grid" x1="285" y1="55" x2="285" y2="345"/>
+    <rect class="row-alt" x="0" y="100" width="390" height="45"/>
+    <rect class="row-alt" x="0" y="190" width="390" height="45"/>
+    <rect class="row-alt" x="0" y="280" width="390" height="45"/>
+    <line class="grid" x1="0" y1="100" x2="390" y2="100"/>
+    <line class="grid" x1="0" y1="145" x2="390" y2="145"/>
+    <line class="grid" x1="0" y1="190" x2="390" y2="190"/>
+    <line class="grid" x1="0" y1="235" x2="390" y2="235"/>
+    <line class="grid" x1="0" y1="280" x2="390" y2="280"/>
+    <text class="cell" x="18" y="86">Guid</text><text class="cell" x="120" y="86">Id</text><text class="key" x="315" y="86">PK</text>
+    <text class="cell" x="18" y="131">Guid</text><text class="cell" x="120" y="131">BookingId</text><text class="key" x="315" y="131">FK</text>
+    <text class="cell" x="18" y="176">decimal</text><text class="cell" x="120" y="176">Amount</text>
+    <text class="cell" x="18" y="221">string</text><text class="cell" x="120" y="221">PaymentMethod</text>
+    <text class="cell" x="18" y="266">string</text><text class="cell" x="120" y="266">PaymentStatus</text>
+    <text class="cell" x="18" y="311">DateTime?</text><text class="cell" x="120" y="311">PaidAt</text>
+  </g>
+
+  <!-- Relationships -->
+  <path class="rel" d="M 235 500 C 260 575, 400 685, 520 805"/>
+  <text class="cardinality" x="235" y="530">1</text>
+  <text class="cardinality" x="475" y="790">0..*</text>
+  <text class="rel-label" x="300" y="650">places</text>
+
+  <path class="rel" d="M 810 545 C 805 595, 770 635, 725 670"/>
+  <text class="cardinality" x="815" y="575">1</text>
+  <text class="cardinality" x="735" y="660">0..*</text>
+  <text class="rel-label" x="735" y="625">is booked in</text>
+
+  <path class="rel" d="M 400 250 C 520 250, 560 340, 620 360"/>
+  <text class="cardinality" x="415" y="238">1</text>
+  <text class="cardinality" x="565" y="350">0..*</text>
+  <text class="rel-label" x="455" y="295">creates</text>
+
+  <path class="rel" d="M 930 850 C 980 850, 1030 850, 1080 850"/>
+  <text class="cardinality" x="945" y="838">1</text>
+  <text class="cardinality" x="1015" y="838">0..1</text>
+  <text class="rel-label" x="955" y="895">has payment</text>
+
+  <text class="note" x="1160" y="500">Article is standalone content.</text>
+</svg>
