@@ -113,7 +113,7 @@ https://localhost:5255/swagger
 
 ### Live Server (recommended)
 
-1. Open the `frontend/` folder in **VS Code**.
+1. Open the `Lux Hotel 1/` folder in **VS Code**.
 2. Install the **Live Server** extension if not already installed.
 3. Right-click `index.html` → select **"Open with Live Server"**.
 4. The site opens at `http://127.0.0.1:5500`.
