@@ -1,198 +1,351 @@
-# Lux Hotel
+# Lux Hotel Project - Setup & Run Guide
 
-Lux Hotel là giao diện website khách sạn responsive, được xây dựng bằng HTML, CSS và JavaScript thuần. Dự án hiện có phần Front-end tĩnh và được định hướng tích hợp với hệ thống Backend RESTful API cho nghiệp vụ quản lý phòng, đặt phòng, tài khoản người dùng và tin tức khách sạn.
-
-## Mục tiêu dự án
-
-- Xây dựng giao diện giới thiệu khách sạn Lux Hotel theo mẫu Hotel Luxe.
-- Cung cấp form kiểm tra phòng trống và đăng ký nhận tin.
-- Hiển thị danh sách phòng, dịch vụ, đánh giá khách hàng và bài viết tin tức.
-- Chuẩn bị cấu trúc dữ liệu và luồng tích hợp Backend cho hệ thống đặt phòng khách sạn.
-
-## Trạng thái hiện tại
-
-- Front-end: đã có giao diện tĩnh, responsive layout, slider, menu mobile, form validation và dữ liệu mẫu render bằng JavaScript.
-- Backend: đang ở giai đoạn kế hoạch triển khai bằng ASP.NET Core, Entity Framework Core và Clean Architecture.
-
-## Công nghệ sử dụng
-
-- HTML5
-- CSS3
-- JavaScript
-- Bootstrap 5.2.3
-- Font Awesome 4.7
-- Google Fonts: Old Standard TT, Open Sans
-
-## Tính năng Front-end
-
-- Header gồm thông tin liên hệ, logo, menu điều hướng và submenu Room.
-- Menu responsive cho thiết bị di động.
-- Hero slider với ảnh nền, tiêu đề và form kiểm tra phòng trống.
-- Form validation cho Arrival Date, Departure Date và Email.
-- Danh sách phòng khách sạn gồm Standard Room, Beach Villa, Exclusive Suite và Luxury Suite.
-- Slider phòng riêng cho desktop và mobile.
-- Slider giới thiệu Culinary Experience và Spa Like No Other.
-- Khu vực Inspired Incentives với hiệu ứng hover đổi ảnh nền.
-- Khu vực đánh giá khách hàng.
-- Khu vực Articles & News.
-- Footer với thông tin liên hệ, quick links, form đăng ký email và nút Go to top.
-
-## Cấu trúc thư mục
-
-```text
-Lux Hotel 1/
-|-- index.html
-|-- index copy.html
-|-- style.css
-|-- dom.js
-|-- Images/
-|-- incentives/
-|-- Desktop UI.png
-|-- Mobile UI.png
-|-- Desktop - Menu.jpg
-|-- Mobile - Menu.jpg
-`-- Read me.docx
-```
-
-## Cách chạy dự án
-
-1. Clone repository:
+## 1. Clone the Project
 
 ```bash
-git clone <repository-url>
-cd "Lux Hotel 1"
+git clone https://github.com/Van-Hoang-123/Lux-Hotel---Phase-2
+cd Lux-Hotel---Phase-2
 ```
 
-2. Mở file `index.html` bằng trình duyệt.
+Or download the source code as a ZIP file and extract it.
 
-3. Có thể dùng extension Live Server trong VS Code để chạy giao diện với local server.
+---
 
-> Lưu ý: dự án đang dùng Bootstrap, Font Awesome và Google Fonts qua CDN, vì vậy cần kết nối Internet để giao diện hiển thị đầy đủ.
+## 2. Requirements
 
-## Dữ liệu mẫu trên giao diện
+Make sure the following tools are installed:
 
-### Room
-
-| Tên phòng | Giá khởi điểm |
-| --- | ---: |
-| Standard Room | $60.0/night |
-| Beach Villa | $90.0/night |
-| Exclusive Suite | $120.0/night |
-| Luxury Suite | $160.0/night |
-
-### Inspired Incentives
-
-| Dịch vụ | Mô tả |
-| --- | --- |
-| Airport Pickup | Đưa đón khách từ sân bay. |
-| Complementary Breakfast | Bữa sáng miễn phí. |
-| City Tour Guide | Hướng dẫn viên tham quan thành phố. |
-| Beach BBQ Party | Tiệc BBQ trên bãi biển. |
-
-## Định hướng Backend
-
-Theo kế hoạch phát triển, Backend sẽ được xây dựng theo mô hình Clean Architecture với ASP.NET Core và Entity Framework Core.
-
-Các module chính:
-
-- User: đăng ký, đăng nhập, quản lý hồ sơ cá nhân và phân quyền Admin/User.
-- Room: quản lý danh sách phòng, chi tiết phòng, giá phòng và hình ảnh.
-- Booking: kiểm tra phòng trống, đặt phòng, quản lý lịch sử đặt phòng và tránh đặt trùng lịch.
-- Article/News: quản lý bài viết và tin tức hiển thị trên website.
-- Security: JWT Authentication, Role-based Authorization, input validation, chống SQL Injection, XSS và CSRF.
-- Testing: unit test cho các logic nghiệp vụ quan trọng.
-- DevOps: Swagger UI hoặc Postman Collection, Docker và triển khai cloud nếu mở rộng.
-
-## API dự kiến
-
-| Method | Endpoint | Chức năng |
+| Tool | Version | Download |
 | --- | --- | --- |
-| POST | `/api/auth/register` | Đăng ký tài khoản |
-| POST | `/api/auth/login` | Đăng nhập và nhận JWT |
-| GET | `/api/users/profile` | Lấy thông tin hồ sơ người dùng |
-| PUT | `/api/users/profile` | Cập nhật hồ sơ người dùng |
-| GET | `/api/rooms` | Lấy danh sách phòng |
-| GET | `/api/rooms/{id}` | Lấy chi tiết phòng |
-| POST | `/api/rooms` | Tạo phòng mới dành cho Admin |
-| PUT | `/api/rooms/{id}` | Cập nhật thông tin phòng dành cho Admin |
-| DELETE | `/api/rooms/{id}` | Xóa phòng dành cho Admin |
-| POST | `/api/bookings/check-availability` | Kiểm tra phòng trống |
-| POST | `/api/bookings` | Tạo đặt phòng |
-| GET | `/api/bookings/my` | Xem lịch sử đặt phòng của người dùng |
-| GET | `/api/articles` | Lấy danh sách bài viết |
-| GET | `/api/articles/{id}` | Lấy chi tiết bài viết |
+| .NET SDK | 9.0 | https://dotnet.microsoft.com/download |
+| SQL Server | 2019+ or LocalDB | https://www.microsoft.com/sql-server |
+| Visual Studio 2022 | any | https://visualstudio.microsoft.com |
+| VS Code *(alternative)* | any | https://code.visualstudio.com |
 
-Các field Front-end đang dùng cần được giữ theo chuẩn camelCase khi tích hợp API:
+Verify .NET installation:
+
+```bash
+dotnet --version
+# Expected: 9.x.x
+```
+
+---
+
+## 3. Open the Project
+
+Open the `.sln` file using **Visual Studio 2022**, or open the root folder in **VS Code**.
+
+---
+
+## 4. Install Dependencies
+
+Open a terminal in the root directory (where the `.sln` file is located) and run:
+
+```bash
+dotnet restore
+```
+
+---
+
+## 5. Configure the Connection String
+
+Open `src/LuxHotel.Api/appsettings.json` and update the connection string with your SQL Server name:
 
 ```json
-{
-  "arrivalDate": "2026-05-18",
-  "departureDate": "2026-05-20",
-  "adult": "adult",
-  "children": "children",
-  "email": "example@gmail.com"
+"ConnectionStrings": {
+  "DefaultConnection": "Server=YOUR_SERVER_NAME;Database=LuxHotelDB;Trusted_Connection=True;TrustServerCertificate=True"
 }
 ```
 
-## Phân công công việc dự kiến
+Example:
 
-| Vai trò | Nhiệm vụ chính |
-| --- | --- |
-| Team Leader & Software Architect | Khởi tạo kiến trúc Clean Architecture, quản lý Git workflow, review Pull Request và điều phối tiến độ. |
-| Database & Identity Engineer | Thiết kế ERD, cấu hình DbContext, Migration, User Management và ASP.NET Identity. |
-| Security & Authentication Specialist | Cấu hình JWT, phân quyền, validation và middleware bảo mật. |
-| Core Developer A - Room Engine | Xây dựng CRUD Room, API danh sách phòng và chi tiết phòng. |
-| Core Developer B - Booking Engine | Xây dựng nghiệp vụ đặt phòng, kiểm tra phòng trống, phân trang, lọc và sắp xếp. |
-| Advanced Features & Testing Engineer | Upload ảnh, Logging, Caching, Blog API và Unit Test. |
-| DevOps, Documentation & FE Integration | Tích hợp Front-end với API thật, Swagger/Postman, tài liệu setup và Docker/deploy nếu có. |
-
-## Git workflow
-
-- Không commit trực tiếp lên `main` hoặc `master`.
-- Mỗi tính năng được phát triển trên một branch riêng theo mẫu:
-
-```bash
-feature/room-api
-feature/booking-api
-feature/authentication
-feature/frontend-integration
+```json
+"ConnectionStrings": {
+  "DefaultConnection": "Server=DESKTOP-12345;Database=LuxHotelDB;Trusted_Connection=True;TrustServerCertificate=True"
+}
 ```
 
-- Sau khi hoàn thành, tạo Pull Request để review trước khi merge.
-- Commit message nên ngắn gọn, rõ phần việc đã làm.
+> To find your server name, open **SQL Server Management Studio (SSMS)** — the server name appears on the login screen.
 
-Ví dụ:
+---
+
+## 6. Database Setup
+
+Run the following command from the root directory:
 
 ```bash
-git checkout -b feature/room-api
-git add .
-git commit -m "Add room API endpoints"
-git push origin feature/room-api
+dotnet ef database update --project src/LuxHotel.Infrastructure/ --startup-project src/LuxHotel.Api/
 ```
 
-## Roadmap
+This will create the `LuxHotelDB` database and all tables automatically.
 
-- [x] Xây dựng giao diện trang chủ Lux Hotel.
-- [x] Thêm responsive menu cho mobile.
-- [x] Thêm slider phòng, slider dịch vụ và hiệu ứng hover.
-- [x] Thêm validation cơ bản cho form.
-- [ ] Tích hợp API Room thay cho dữ liệu tĩnh trong `dom.js`.
-- [ ] Tích hợp API Booking cho form Check Availability và Book Now.
-- [ ] Tích hợp Authentication bằng JWT.
-- [ ] Thêm Swagger UI hoặc Postman Collection.
-- [ ] Viết Unit Test cho các nghiệp vụ chính.
-- [ ] Đóng gói Docker và deploy nếu mở rộng.
+> If you see an error about no migrations found, create the initial migration first:
+> ```bash
+> dotnet ef migrations add InitialCreate --project src/LuxHotel.Infrastructure/ --startup-project src/LuxHotel.Api/
+> dotnet ef database update --project src/LuxHotel.Infrastructure/ --startup-project src/LuxHotel.Api/
+> ```
 
-## Lưu ý khi deploy
+---
 
-- Giữ nguyên cấu trúc thư mục `Images/` để ảnh không bị lỗi đường dẫn.
-- Khi deploy lên GitHub Pages hoặc môi trường Linux, nên thống nhất chữ hoa/thường trong đường dẫn ảnh vì hệ thống file có phân biệt `Images` và `images`.
-- Các thư viện CDN cần Internet để tải font, icon và Bootstrap.
+## 7. Run the Backend API
 
-## Nguồn tham khảo
+```bash
+cd src/LuxHotel.Api
+dotnet run
+```
 
-Giao diện được tham khảo từ Hotel Luxe demo của ThemeBubble: https://themebubble.com/demo/hotelluxe/home/
+The API will be available at:
 
-## Tác giả
+```
+http://localhost:5255
+https://localhost:7210
+```
 
-Dự án thực hiện cho môn CSW306 - Phát triển Backend.
+Swagger UI (for testing endpoints):
+
+```
+https://localhost:5255/swagger
+```
+
+---
+
+## 8. Run the Frontend
+
+### Live Server (recommended)
+
+1. Open the `frontend/` folder in **VS Code**.
+2. Install the **Live Server** extension if not already installed.
+3. Right-click `index.html` → select **"Open with Live Server"**.
+4. The site opens at `http://127.0.0.1:5500`.
+
+---
+
+## 9. API Endpoints
+
+### Authentication
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/api/auth/register` | Register a new account |
+| POST | `/api/auth/login` | Login and receive JWT token |
+
+### Rooms
+
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/api/rooms` | Get all rooms | — |
+| GET | `/api/rooms/{id}` | Get room by ID | — |
+| POST | `/api/rooms` | Create a new room | Admin |
+| PUT | `/api/rooms/{id}` | Update room info | Admin |
+| DELETE | `/api/rooms/{id}` | Delete a room | Admin |
+
+### Bookings
+
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/api/bookings/check-availability` | Check room availability | — |
+| POST | `/api/bookings` | Create a booking | User |
+| GET | `/api/bookings/my` | View booking history | User |
+
+### Articles
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/articles` | Get all articles |
+| GET | `/api/articles/{id}` | Get article by ID |
+
+---
+
+## 10. Example Request Bodies
+
+### Check Availability
+
+```http
+POST /api/bookings/check-availability
+Content-Type: application/json
+```
+
+```json
+{
+  "arrivalDate": "2026-06-01",
+  "departureDate": "2026-06-05",
+  "adults": 2,
+  "children": 1
+}
+```
+
+### Login
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "example@gmail.com",
+  "password": "yourpassword"
+}
+```
+
+---
+
+### Get All Rooms
+
+```http
+GET /api/rooms
+```
+
+**Response `200 OK`:**
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Standard Room",
+    "imageUrl": "/images/room-standard.jpg",
+    "pricePerNight": 60.00,
+    "description": "Warm textures, soft linens, and a private corner for slower mornings."
+  },
+  {
+    "id": 2,
+    "title": "Beach Villa",
+    "imageUrl": "/images/room-beach-villa.jpg",
+    "pricePerNight": 90.00,
+    "description": "Steps from the shore with open-air lounging and quiet ocean light."
+  }
+]
+```
+
+---
+
+### Get Room By ID
+
+```http
+GET /api/rooms/{id}
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": 1,
+  "title": "Standard Room",
+  "imageUrl": "/images/room-standard.jpg",
+  "pricePerNight": 60.00,
+  "description": "Warm textures, soft linens, and a private corner for slower mornings."
+}
+```
+
+**Response `404 Not Found`:**
+
+```json
+{
+  "message": "Không tìm thấy phòng nào có Id = 1."
+}
+```
+
+---
+
+### Create Room *(Admin only)*
+
+```http
+POST /api/rooms
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "title": "Luxury Suite",
+  "imageUrl": "/images/room-luxury-suite.jpg",
+  "pricePerNight": 160.00,
+  "description": "The signature stay: generous space, bay views, and personal service."
+}
+```
+
+**Response `201 Created`:**
+
+```json
+{
+  "id": 5,
+  "title": "Luxury Suite",
+  "imageUrl": "/images/room-luxury-suite.jpg",
+  "pricePerNight": 160.00,
+  "description": "The signature stay: generous space, bay views, and personal service."
+}
+```
+
+---
+
+### Update Room *(Admin only)*
+
+```http
+PUT /api/rooms/{id}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "title": "Luxury Suite",
+  "imageUrl": "/images/room-luxury-suite-v2.jpg",
+  "pricePerNight": 175.00,
+  "description": "Updated description with new amenities."
+}
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": 5,
+  "title": "Luxury Suite",
+  "imageUrl": "/images/room-luxury-suite-v2.jpg",
+  "pricePerNight": 175.00,
+  "description": "Updated description with new amenities."
+}
+```
+
+---
+
+### Delete Room *(Admin only)*
+
+```http
+DELETE /api/rooms/{id}
+Authorization: Bearer <token>
+```
+
+**Response `204 No Content`**
+
+---
+
+## 11. Technologies Used
+
+**Backend:** .NET 9, ASP.NET Core Web API, Entity Framework Core, SQL Server, JWT Authentication, Clean Architecture
+
+**Frontend:** HTML5, CSS3, JavaScript, Bootstrap 5.2.3, Font Awesome 4.7, Google Fonts
+
+---
+
+## 12. Project Structure
+
+```text
+Lux-Hotel---Phase-2/
+├── src/
+│   ├── LuxHotel.Api/              # Web API entry point
+│   │   ├── Controllers/
+│   │   ├── Properties/
+│   │   │   └── launchSettings.json
+│   │   ├── appsettings.json
+│   │   └── Program.cs
+│   ├── LuxHotel.Application/      # Business logic, DTOs
+│   ├── LuxHotel.Domain/           # Entities, Interfaces
+│   └── LuxHotel.Infrastructure/   # EF Core, DbContext, Migrations
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   ├── dom.js
+│   └── Images/
+└── README.md
+```

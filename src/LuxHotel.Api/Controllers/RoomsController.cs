@@ -1,6 +1,6 @@
-﻿using LuxHotel.Application.Dtos;
-using LuxHotel.Domain.Entities;
-using LuxHotel.Domain.Interfaces;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -18,46 +18,15 @@ namespace LuxHotel.Api.Controllers
             _context = context;
         }
 
-        // GET /api/rooms
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAllRooms()
         {
-            var rooms = await _context.GetAllAsync();
-            var result = rooms.Select(r => new RoomDto
-            {
-                Id = r.Id,
-                RoomType = r.RoomType,
-                PricePerNight = r.PricePerNight,
-                ImageUrl = r.ImageUrl,
-                Description = r.Description,
-                IsAvailable = r.IsAvailable
-            });
-            return Ok(result);
+            var rooms = await _context.Rooms.ToListAsync();
+            return Ok(rooms);
         }
 
-        // GET /api/rooms/{id}
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            var room = await _context.GetByIdAsync(id);
-            if (room is null)
-                return NotFound(new { message = $"Room {id} not found." });
-
-            return Ok(new RoomDto
-            {
-                Id = room.Id,
-                RoomType = room.RoomType,
-                PricePerNight = room.PricePerNight,
-                ImageUrl = room.ImageUrl,
-                Description = room.Description,
-                IsAvailable = room.IsAvailable
-            });
-        }
-
-        // POST /api/rooms
-        [HttpPost]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Create([FromBody] CreateRoomDto dto)
+        [HttpGet("{id}")] // Test Get Book By Id
+        public async Task<IActionResult> GetRoomById(int id)
         {
             var room = new Room
             {

@@ -10,6 +10,9 @@ public class BookingValidator : AbstractValidator<BookingRequestDto>
 
     public BookingValidator()
     {
+        RuleFor(x => x.RoomId)
+            .GreaterThan(0).WithMessage("roomId must be greater than 0.");
+
         RuleFor(x => x.ArrivalDate)
             .NotEmpty().WithMessage("arrivalDate is required.")
             .Must(BeTodayOrLater).WithMessage("arrivalDate must be today or later.");
@@ -20,14 +23,12 @@ public class BookingValidator : AbstractValidator<BookingRequestDto>
                 .WithMessage("departureDate must be after arrivalDate.");
 
         RuleFor(x => x.Adult)
-            .NotEmpty().WithMessage("adult is required.")
-            .Must(s => int.TryParse(s, out var n) && n >= 1 && n <= MaxAdults)
-                .WithMessage($"adult must be an integer between 1 and {MaxAdults}.");
+            .InclusiveBetween(1, MaxAdults)
+                .WithMessage($"adult must be between 1 and {MaxAdults}.");
 
         RuleFor(x => x.Children)
-            .NotEmpty().WithMessage("children is required.")
-            .Must(s => int.TryParse(s, out var n) && n >= 0 && n <= MaxChildren)
-                .WithMessage($"children must be an integer between 0 and {MaxChildren}.");
+            .InclusiveBetween(0, MaxChildren)
+                .WithMessage($"children must be between 0 and {MaxChildren}.");
     }
 
     private static bool BeTodayOrLater(DateTime date) => date.Date >= DateTime.UtcNow.Date;
