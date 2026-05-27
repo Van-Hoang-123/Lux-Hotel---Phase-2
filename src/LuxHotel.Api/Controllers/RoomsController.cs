@@ -2,9 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LuxHotel.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 
 namespace LuxHotel.Api.Controllers
 {
@@ -12,10 +9,12 @@ namespace LuxHotel.Api.Controllers
     [ApiController]
     public class RoomsController : ControllerBase
     {
-        private readonly IRoomRepository _context;
-        public RoomsController(IRoomRepository context)
+        private readonly LuxHotelDbContext _context;
+        private readonly IWebHostEnvironment _env;
+        public RoomsController(LuxHotelDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
         [HttpGet]
@@ -28,48 +27,17 @@ namespace LuxHotel.Api.Controllers
         [HttpGet("{id}")] // Test Get Book By Id
         public async Task<IActionResult> GetRoomById(int id)
         {
-            var room = new Room
+            // Tìm phòng trong Database dựa vào Id truyền lên
+            var room = await _context.Rooms.FindAsync(id);
+
+            // Nếu không tìm thấy phòng, trả về mã trạng thái HTTP 404 Not Found
+            if (room == null)
             {
-                RoomType = dto.RoomType,
-                PricePerNight = dto.PricePerNight,
-                ImageUrl = dto.ImageUrl,
-                Description = dto.Description,
-                IsAvailable = true
-            };
-            var created = await _context.CreateAsync(room);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
-        }
+                return NotFound(new { message = $"Không tìm thấy phòng nào có Id = {id}." });
+            }
 
-        // PUT /api/rooms/1
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateRoomDto dto)
-        {
-            var room = new Room
-            {
-                RoomType = dto.RoomType,
-                PricePerNight = dto.PricePerNight,
-                ImageUrl = dto.ImageUrl,
-                Description = dto.Description,
-                IsAvailable = dto.IsAvailable
-            };
-            var updated = await _context.UpdateAsync(id, room);
-            if (updated is null)
-                return NotFound(new { message = $"Room {id} not found." });
-
-            return Ok(updated);
-        }
-
-        // DELETE /api/rooms/1
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            var success = await _context.DeleteAsync(id);
-            if (!success)
-                return NotFound(new { message = $"Room {id} not found." });
-
-            return NoContent();
+            // Nếu tìm thấy, trả về mã trạng thái HTTP 200 OK kèm theo dữ liệu của phòng (JSON)
+            return Ok(room);
         }
     }
 }
