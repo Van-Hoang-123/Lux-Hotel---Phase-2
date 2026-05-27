@@ -29,12 +29,10 @@ namespace LuxHotel.Domain.Entities
         public DateTime DepartureDate { get; set; } // Ngày đi trả phòng
 
         [Required]
-        [StringLength(50)]
-        public string Adult { get; set; } // Số lượng/Phân loại người lớn
+        public int Adult { get; set; } // Số lượng người lớn
 
         [Required]
-        [StringLength(50)]
-        public string Children { get; set; } // Số lượng/Phân loại trẻ em
+        public int Children { get; set; } // Số lượng trẻ em
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
