@@ -33,6 +33,7 @@ const toastTimeoutMs = 4400;
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
+  profile: ["/auth/profile", "/auth/me", "/users/profile", "/users/me", "/profile"],
 };
 
 async function apiFetch(path, options = {}) {
@@ -132,9 +133,53 @@ function getStoredAuth() {
   }
 }
 
+function readJwtPayload(token) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return {};
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(window.atob(padded));
+  } catch {
+    return {};
+  }
+}
+
+function firstValue(...values) {
+  return values.find((value) => typeof value === "string" && value.trim())?.trim() || "";
+}
+
+function normalizeAuthUser(user = {}, token = "") {
+  const claims = readJwtPayload(token);
+  const nameClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
+  const emailClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
+  const idClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
+  const roleClaim = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+  const roles = user.roles || user.Roles || claims.roles || claims.Roles || claims.role || claims[roleClaim] || [];
+
+  return {
+    id: firstValue(user.id, user.Id, claims.sub, claims.nameid, claims[idClaim]),
+    email: firstValue(user.email, user.Email, claims.email, claims.Email, claims[emailClaim]),
+    fullName: firstValue(
+      user.fullName,
+      user.FullName,
+      user.name,
+      user.Name,
+      user.userName,
+      user.UserName,
+      claims.fullName,
+      claims.FullName,
+      claims.name,
+      claims.unique_name,
+      claims[nameClaim]
+    ),
+    roles: Array.isArray(roles) ? roles : [roles].filter(Boolean),
+  };
+}
+
 function storeAuth(data) {
-  const user = data?.user || data?.User || {};
-  const token = data?.token || data?.Token || "";
+  const user = data?.user || data?.User || data?.profile || data?.Profile || data || {};
+  const token = data?.token || data?.Token || data?.accessToken || data?.AccessToken || data?.access_token || "";
   const expiresAtUtc = data?.expiresAtUtc || data?.ExpiresAtUtc || "";
 
   if (!token) return null;
@@ -142,20 +187,55 @@ function storeAuth(data) {
   const auth = {
     token,
     expiresAtUtc,
-    user: {
-      id: user.id || user.Id || "",
-      email: user.email || user.Email || "",
-      fullName: user.fullName || user.FullName || "",
-      roles: user.roles || user.Roles || [],
-    },
+    user: normalizeAuthUser(user, token),
   };
 
   localStorage.setItem(authStorageKey, JSON.stringify(auth));
   return auth;
 }
 
+function saveAuth(auth) {
+  localStorage.setItem(authStorageKey, JSON.stringify(auth));
+  return auth;
+}
+
 function clearStoredAuth() {
   localStorage.removeItem(authStorageKey);
+}
+
+function getDisplayName(user = {}) {
+  return user.fullName || user.email || "Guest";
+}
+
+async function refreshAuthProfile(auth) {
+  if (!auth?.token) return auth;
+
+  for (const path of authEndpointPaths.profile) {
+    try {
+      const response = await apiFetch(path, {
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+      });
+
+      if (!response.ok) continue;
+
+      const data = await readJson(response);
+      const profile = data?.user || data?.User || data?.profile || data?.Profile || data || {};
+      const normalized = normalizeAuthUser(profile, auth.token);
+      const user = {
+        id: normalized.id || auth.user?.id || "",
+        email: normalized.email || auth.user?.email || "",
+        fullName: normalized.fullName || auth.user?.fullName || "",
+        roles: normalized.roles.length ? normalized.roles : auth.user?.roles || [],
+      };
+      return saveAuth({ ...auth, user });
+    } catch {
+      // Profile endpoints are optional; login/register responses may already include the database user.
+    }
+  }
+
+  return auth;
 }
 
 function formatApiError(data, fallback) {
@@ -622,17 +702,37 @@ function setAuthStatus(type, message) {
 function updateAccountSummary(auth = getStoredAuth()) {
   const summary = $("#accountSummary");
   const logoutButton = $("#logoutButton");
+  const profile = $("#authProfile");
+  const profileName = $("#authProfileName");
+  const profileEmail = $("#authProfileEmail");
+  const tabs = $(".auth-tabs");
+  const panels = $$("[data-auth-panel]");
   if (!summary || !logoutButton) return;
 
   const user = auth?.user;
-  if (auth?.token && user) {
-    const name = user.fullName || user.email || "guest";
+  if (auth?.token) {
+    const name = getDisplayName(user);
     summary.textContent = `Welcome back, ${name}.`;
+    if (profile) profile.hidden = false;
+    if (profileName) profileName.textContent = name;
+    if (profileEmail) profileEmail.textContent = user?.email || "Guest account ready";
+    if (tabs) tabs.hidden = true;
+    panels.forEach((panel) => {
+      panel.hidden = true;
+    });
     logoutButton.hidden = false;
     return;
   }
 
   summary.textContent = "Sign in to keep your booking profile ready before arrival.";
+  if (profile) profile.hidden = true;
+  if (profileName) profileName.textContent = "Guest";
+  if (profileEmail) profileEmail.textContent = "";
+  if (tabs) tabs.hidden = false;
+  const activePanel = $("[data-auth-panel].is-active") || $("#loginForm");
+  panels.forEach((panel) => {
+    panel.hidden = panel !== activePanel;
+  });
   logoutButton.hidden = true;
 }
 
@@ -720,9 +820,11 @@ async function submitAuthForm(form, mode) {
       return;
     }
 
-    updateAccountSummary(auth);
+    const enrichedAuth = await refreshAuthProfile(auth);
+    const name = getDisplayName(enrichedAuth.user);
+    updateAccountSummary(enrichedAuth);
     form.reset();
-    setAuthStatus("success", mode === "login" ? "Logged in successfully." : "Account created successfully.");
+    setAuthStatus("success", mode === "login" ? `Logged in as ${name}.` : `Account created for ${name}.`);
   } catch (error) {
     console.error("Auth API error:", error);
     setAuthStatus("error", "Cannot connect to the backend auth API.");
@@ -736,6 +838,7 @@ function setupAuthForms() {
   if (!$("#loginForm") || !$("#registerForm")) return;
 
   updateAccountSummary();
+  refreshAuthProfile(getStoredAuth()).then(updateAccountSummary);
 
   $$("[data-auth-tab]").forEach((button) => {
     button.addEventListener("click", () => switchAuthPanel(button.dataset.authTab));
@@ -753,6 +856,7 @@ function setupAuthForms() {
 
   $("#logoutButton").addEventListener("click", () => {
     clearStoredAuth();
+    switchAuthPanel("login");
     updateAccountSummary(null);
     setAuthStatus("success", "Logged out.");
   });
