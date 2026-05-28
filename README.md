@@ -342,10 +342,11 @@ Lux-Hotel---Phase-2/
 │   ├── LuxHotel.Application/      # Business logic, DTOs
 │   ├── LuxHotel.Domain/           # Entities, Interfaces
 │   └── LuxHotel.Infrastructure/   # EF Core, DbContext, Migrations
-├── frontend/
-│   ├── index.html
-│   ├── style.css
+├── Lux Hotel 1/
+│   ├── Images/
+│   ├── incentives/
 │   ├── dom.js
-│   └── Images/
+│   ├── index.html
+│   └── style.css
 └── README.md
 ```
