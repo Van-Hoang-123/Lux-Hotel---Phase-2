@@ -876,6 +876,7 @@ select:focus {
     display: grid;
     align-content: end;
     padding: 24px;
+    background-color: var(--deep);
     background-position: center;
     background-size: cover;
     color: #fff;

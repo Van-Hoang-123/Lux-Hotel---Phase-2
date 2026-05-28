@@ -242,14 +242,19 @@ async function refreshAuthProfile(auth) {
 function formatApiError(data, fallback) {
   if (!data) return fallback;
   if (typeof data === "string") return data;
-  if (data.message || data.Message) return data.message || data.Message;
   const errors = data.errors || data.Errors;
 
-  if (Array.isArray(errors)) return errors.join(" ");
-  if (errors && typeof errors === "object") {
-    return Object.values(errors).flat().filter(Boolean).join(" ") || fallback;
+  if (Array.isArray(errors) && errors.length) {
+    const message = data.message || data.Message;
+    return [message, errors.join(" ")].filter(Boolean).join(" ");
   }
 
+  if (errors && typeof errors === "object") {
+    const details = Object.values(errors).flat().filter(Boolean).join(" ");
+    if (details) return details;
+  }
+
+  if (data.message || data.Message) return data.message || data.Message;
   return data.title || data.Title || fallback;
 }
 
@@ -507,7 +512,7 @@ function renderRooms() {
         <article class="room-card">
           <button class="room-card-button" type="button" data-room-index="${index}" aria-label="View ${escapeHtml(room.title)} details">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(room.title)}" loading="lazy" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(room.title)}" loading="lazy" decoding="async" />
             </div>
             <div class="content">
               <p class="price">${escapeHtml(room.price)}</p>
@@ -530,7 +535,7 @@ function renderAmenities() {
   $("#amenitiesGrid").innerHTML = amenities
     .map(
       (item) => `
-        <article class="amenity-card" style="background-image: url('${escapeHtml(item.image)}')">
+        <article class="amenity-card" data-bg="${escapeHtml(item.image)}">
           <h3>${escapeHtml(item.title)}</h3>
           <p>${escapeHtml(item.copy)}</p>
         </article>
@@ -545,7 +550,7 @@ function renderReviews() {
       (review) => `
         <article class="review-card">
           <header>
-            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" />
+            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
               <p>Verified guest</p>
@@ -563,7 +568,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(post.title)}" loading="lazy" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(post.title)}" loading="lazy" decoding="async" />
           <div class="content">
             <p class="tag">${escapeHtml(post.tag)}</p>
             <h3>${escapeHtml(post.title)}</h3>
@@ -580,7 +585,7 @@ function renderGallery() {
     .map(
       (item, index) => `
         <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="Open ${escapeHtml(item.title)}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy" />
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy" decoding="async" />
           <span>
             <small>${escapeHtml(item.kicker)}</small>
             <strong>${escapeHtml(item.title)}</strong>
@@ -589,6 +594,37 @@ function renderGallery() {
       `
     )
     .join("");
+}
+
+function setupLazyBackgrounds(root = document) {
+  const cards = $$("[data-bg]", root);
+  if (!cards.length) return;
+
+  const loadBackground = (card) => {
+    const image = card.dataset.bg;
+    if (!image) return;
+    card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
+    card.classList.add("is-bg-loaded");
+    card.removeAttribute("data-bg");
+  };
+
+  if (!("IntersectionObserver" in window)) {
+    cards.forEach(loadBackground);
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        loadBackground(entry.target);
+        observer.unobserve(entry.target);
+      });
+    },
+    { rootMargin: "240px 0px" }
+  );
+
+  cards.forEach((card) => observer.observe(card));
 }
 
 async function fetchRooms() {
@@ -892,9 +928,16 @@ async function submitAuthForm(form, mode) {
   const email = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
   const fullName = String(formData.get("fullName") || "").trim();
+  const confirmPassword = String(formData.get("confirmPassword") || "");
+  const phoneNumber = String(formData.get("phoneNumber") || "").trim();
 
   if (!email || !email.includes("@") || !password || (mode === "register" && !fullName)) {
     setAuthStatus("error", "Fill in the required account fields.");
+    return;
+  }
+
+  if (mode === "register" && password !== confirmPassword) {
+    setAuthStatus("error", "Confirm password must match password.");
     return;
   }
 
@@ -902,7 +945,10 @@ async function submitAuthForm(form, mode) {
   submitButton.textContent = mode === "login" ? "Logging in..." : "Creating...";
 
   try {
-    const payload = mode === "login" ? { email, password } : { email, password, fullName };
+    const payload =
+      mode === "login"
+        ? { email, password }
+        : { email, password, confirmPassword, fullName, phoneNumber: phoneNumber || null };
     const response = await apiFetchFirst(authEndpointPaths[mode], {
       method: "POST",
       headers: {
@@ -1217,6 +1263,7 @@ function setupAnimations() {
 renderRooms();
 renderRoomOptions();
 renderAmenities();
+setupLazyBackgrounds();
 renderReviews();
 renderJournal();
 renderGallery();
