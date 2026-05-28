@@ -767,6 +767,44 @@ function validateBookingDates(arrival, departure) {
   return true;
 }
 
+function readGuestCount(selector, fallbackValue) {
+  const value = Number.parseInt($(selector).value, 10);
+  return Number.isFinite(value) ? value : fallbackValue;
+}
+
+function validateGuestCounts(adults, children) {
+  if (!Number.isInteger(adults) || adults < 1) {
+    showToast("error", "At least one adult is required.");
+    return false;
+  }
+
+  if (adults > 10) {
+    showToast("error", "Adults must be 10 or fewer.");
+    return false;
+  }
+
+  if (!Number.isInteger(children) || children < 0) {
+    showToast("error", "Children cannot be negative.");
+    return false;
+  }
+
+  if (children > 10) {
+    showToast("error", "Children must be 10 or fewer.");
+    return false;
+  }
+
+  return true;
+}
+
+function normalizeGuestCountInput(input, min, max) {
+  const value = Number.parseInt(input.value, 10);
+  if (!Number.isFinite(value)) {
+    input.value = String(min);
+    return;
+  }
+  input.value = String(Math.min(max, Math.max(min, value)));
+}
+
 function switchAuthPanel(mode) {
   $$("[data-auth-tab]").forEach((button) => {
     const isActive = button.dataset.authTab === mode;
@@ -869,6 +907,9 @@ function setupForms() {
     setBookingStatus("", "");
   });
 
+  $("#adult").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 1, 10));
+  $("#children").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 0, 10));
+
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -876,12 +917,13 @@ function setupForms() {
     const submitButton = form.querySelector('button[type="submit"]');
     const arrival = $("#arrivalDate").value;
     const departure = $("#departureDate").value;
-    const adultCount = Number.parseInt($("#adult").value, 10);
-    const childCount = Number.parseInt($("#children").value, 10);
+    const adultCount = readGuestCount("#adult", 1);
+    const childCount = readGuestCount("#children", 0);
     const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId, 10);
 
     setBookingStatus("", "");
     if (!validateBookingDates(arrival, departure)) return;
+    if (!validateGuestCounts(adultCount, childCount)) return;
 
     submitButton.disabled = true;
     submitButton.textContent = "Checking...";
@@ -897,7 +939,10 @@ function setupForms() {
           roomId,
           arrivalDate: arrival,
           departureDate: departure,
+          adults: adultCount,
+          adult: adultCount,
           adultCount,
+          children: childCount,
           childCount,
         }),
       });
