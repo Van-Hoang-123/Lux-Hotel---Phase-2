@@ -141,6 +141,7 @@ namespace LuxHotel.Api.Controllers
             };
 
             _context.Payments.Add(newPayment);
+            _context.SaveChanges();
 
             var responseDto = new BookingResponseDTO
             {
