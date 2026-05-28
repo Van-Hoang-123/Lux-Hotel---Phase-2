@@ -553,11 +553,31 @@ select {
     padding: 0 14px;
     background: var(--input-bg);
     color: var(--ink);
+    line-height: 1.2;
     outline: none;
 }
 
 input::placeholder {
     color: var(--input-placeholder);
+}
+
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 44px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position:
+        calc(100% - 20px) 50%,
+        calc(100% - 15px) 50%;
+    background-repeat: no-repeat;
+    background-size: 6px 6px, 6px 6px;
+}
+
+select option {
+    background: var(--input-bg);
+    color: var(--ink);
 }
 
 input:focus,
