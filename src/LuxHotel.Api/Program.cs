@@ -5,10 +5,12 @@ using LuxHotel.Application.Security.Interfaces;
 using LuxHotel.Application.Security.Services;
 using LuxHotel.Application.Security.Settings;
 using LuxHotel.Application.Validators;
+using LuxHotel.Domain.Entities;
 using LuxHotel.Domain.Interfaces;
 using LuxHotel.Infrastructure.Persistence;
 using LuxHotel.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -21,6 +23,20 @@ builder.Services.AddDbContext<LuxHotelDbContext>(options =>
 
 // Repositories
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
+
+builder.Services
+    .AddIdentityCore<User>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+    })
+    .AddRoles<IdentityRole<Guid>>()
+    .AddEntityFrameworkStores<LuxHotelDbContext>()
+    .AddDefaultTokenProviders();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.AddSingleton<IJwtService, JwtService>();
