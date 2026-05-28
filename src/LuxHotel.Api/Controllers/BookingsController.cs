@@ -191,7 +191,7 @@ namespace LuxHotel.Api.Controllers
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpPatch("toggle-room-status/{id}")] 
+        [HttpPatch("/api/toggle-room-status/{id}")] 
         public async Task<IActionResult> ToggleRoomAvailableStatus(int id)
         {
            
