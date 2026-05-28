@@ -290,7 +290,9 @@ h1 {
 .ghost-btn,
 .experience-actions button,
 .booking-form button,
-.newsletter-row button {
+.newsletter-row button,
+.auth-form button,
+.auth-logout {
     min-height: 48px;
     display: inline-flex;
     align-items: center;
@@ -305,7 +307,8 @@ h1 {
 
 .primary-btn,
 .booking-form button,
-.newsletter-row button {
+.newsletter-row button,
+.auth-form button {
     border: 1px solid var(--gold);
     background: var(--gold);
     color: #fff;
@@ -315,7 +318,8 @@ h1 {
 
 .primary-btn:hover,
 .booking-form button:hover,
-.newsletter-row button:hover {
+.newsletter-row button:hover,
+.auth-form button:hover {
     border-color: var(--gold-dark);
     background: var(--gold-dark);
     color: #fff;
@@ -323,7 +327,8 @@ h1 {
     transform: translateY(-2px);
 }
 
-.booking-form button:disabled {
+.booking-form button:disabled,
+.auth-form button:disabled {
     cursor: wait;
     opacity: 0.72;
     transform: none;
@@ -332,6 +337,10 @@ h1 {
 .booking-form button {
     min-width: 140px;
     white-space: nowrap;
+}
+
+.auth-form button {
+    width: 100%;
 }
 
 .ghost-btn,
@@ -566,6 +575,11 @@ select:focus {
     transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
+.room-card {
+    min-height: 430px;
+    background: var(--deep);
+}
+
 .room-card:hover,
 .amenity-card:hover,
 .review-card:hover,
@@ -577,9 +591,10 @@ select:focus {
 }
 
 .room-media {
-    position: relative;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    height: clamp(188px, 15vw, 232px);
+    height: 100%;
     overflow: hidden;
     background: var(--deep);
     line-height: 0;
@@ -592,8 +607,8 @@ select:focus {
     height: 100%;
     max-width: none;
     object-fit: cover;
-    object-position: center 58%;
-    transform: scale(1.28);
+    object-position: center;
+    transform: scale(1.08);
     transition: transform 0.5s ease;
 }
 
@@ -607,7 +622,7 @@ select:focus {
 }
 
 .room-card:hover .room-media img {
-    transform: scale(1.34);
+    transform: scale(1.15);
 }
 
 .journal-card:hover img,
@@ -617,8 +632,9 @@ select:focus {
 
 .room-card-button,
 .gallery-item {
+    position: relative;
     width: 100%;
-    height: 100%;
+    min-height: inherit;
     display: block;
     border: 0;
     padding: 0;
@@ -628,7 +644,28 @@ select:focus {
     cursor: pointer;
 }
 
-.room-card .content,
+.room-card-button {
+    display: grid;
+    align-content: end;
+    overflow: hidden;
+}
+
+.room-card-button::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(21, 17, 13, 0.03) 0%, rgba(21, 17, 13, 0.42) 48%, rgba(21, 17, 13, 0.9) 100%);
+    pointer-events: none;
+}
+
+.room-card .content {
+    position: relative;
+    z-index: 2;
+    padding: 24px;
+    color: #fff;
+}
+
 .journal-card .content {
     padding: 20px;
 }
@@ -636,7 +673,8 @@ select:focus {
 .room-card .content strong {
     display: inline-flex;
     margin-top: 16px;
-    color: var(--gold-dark);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.44);
+    color: #fff;
     font-size: 13px;
     font-weight: 800;
     text-transform: uppercase;
@@ -653,10 +691,11 @@ select:focus {
     display: inline-flex;
     align-items: center;
     min-height: 28px;
-    border: 1px solid var(--line);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: 999px;
     padding: 0 10px;
-    color: var(--muted);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
     font-size: 12px;
     font-weight: 800;
 }
@@ -678,8 +717,17 @@ select:focus {
     line-height: 1.6;
 }
 
+.room-card h3 {
+    color: #fff;
+    text-shadow: rgba(0, 0, 0, 0.2) 0 2px 12px;
+}
+
+.room-card p {
+    color: rgba(255, 255, 255, 0.78);
+}
+
 .room-card .price {
-    color: var(--gold-dark);
+    color: rgba(255, 255, 255, 0.82);
     font-size: 13px;
     font-weight: 800;
     letter-spacing: 0;
@@ -864,6 +912,97 @@ select:focus {
     font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
+}
+
+.account-section {
+    background: #f5eee4;
+}
+
+.account-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+    gap: clamp(28px, 6vw, 76px);
+    align-items: start;
+}
+
+.account-copy h2 {
+    margin-bottom: 16px;
+    font-size: 56px;
+    line-height: 1.03;
+}
+
+.account-copy p:not(.eyebrow) {
+    max-width: 520px;
+    margin-bottom: 0;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1.65;
+}
+
+.auth-shell {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 22px;
+    background: var(--card);
+    box-shadow: rgba(23, 19, 15, 0.08) 0 18px 46px;
+}
+
+.auth-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.auth-tabs button,
+.auth-logout {
+    min-height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.auth-tabs button.is-active {
+    border-color: var(--gold);
+    background: var(--gold);
+    color: #fff;
+}
+
+.auth-form {
+    display: none;
+    gap: 14px;
+}
+
+.auth-form.is-active {
+    display: grid;
+}
+
+.auth-form label {
+    display: grid;
+    gap: 8px;
+}
+
+.auth-form label span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-transform: uppercase;
+}
+
+.auth-shell .form-status {
+    margin-top: 14px;
+}
+
+.auth-logout {
+    width: 100%;
+    margin-top: 12px;
+    background: transparent;
+    color: var(--ink);
 }
 
 .site-footer {
@@ -1158,8 +1297,8 @@ select:focus {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .room-media {
-        height: clamp(220px, 30vw, 300px);
+    .room-card {
+        min-height: 380px;
     }
 
     .gallery-grid {
@@ -1222,6 +1361,7 @@ select:focus {
     }
 
     .intro-grid,
+    .account-layout,
     .review-grid,
     .journal-grid,
     .footer-grid {
@@ -1303,8 +1443,8 @@ select:focus {
         grid-template-columns: 1fr;
     }
 
-    .room-media {
-        height: clamp(220px, 62vw, 290px);
+    .room-card {
+        min-height: 420px;
     }
 
     .gallery-grid {
@@ -1318,6 +1458,10 @@ select:focus {
 
     .section-pad {
         padding: 74px 0;
+    }
+
+    .account-copy h2 {
+        font-size: 40px;
     }
 
     .newsletter-row {
