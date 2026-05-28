@@ -22,7 +22,7 @@ namespace LuxHotel.Domain.Entities
 
         [Required]
         [StringLength(50)]
-        public string PaymentStatus { get; set; } = "Pending";
+        public string PaymentStatus { get; set; } = "Pending"; // Pending, Completed
 
         [StringLength(100)]
         public string? TransactionId { get; set; }

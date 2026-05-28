@@ -1,5 +1,4 @@
-﻿
-using LuxHotel.Application.Dtos;
+﻿using LuxHotel.Application.Dtos;
 using LuxHotel.Domain.Entities;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -20,61 +19,45 @@ namespace LuxHotel.Api.Controllers
             _context = context;
         }
 
-
         [HttpPost("/api/bookings/check-availability")]
-        public IActionResult getAllAvailableRooms(CheckAvailableRooomsDTO request)
+        public async Task<IActionResult> GetAllAvailableRooms(CheckAvailableRooomsDTO request) // Thêm async Task<>
         {
-            //  Kiểm tra ngày trống
             if (!request.DepartureDate.HasValue || !request.ArrivalDate.HasValue)
-            {
                 return BadRequest(new { message = "The Departure Date And The Arrival Date Is Required" });
-            }
 
-            //  Kiểm tra ngày hợp lệ
             if (request.DepartureDate <= request.ArrivalDate)
-            {
                 return BadRequest(new { message = "The Departure Date Must Be After The Arrival Date" });
-            }
 
-            //  Kiểm tra số lượng người lớn
             if (request.Adult < 1)
-            {
                 return BadRequest(new { message = "The Number Of Adults Must Be More Than Or Equal To 1" });
-            }
-
-
 
             var arrival = request.ArrivalDate.Value;
             var departure = request.DepartureDate.Value;
-
-            // Vì 2 trẻ em = 1 người lớn, ta quy về phép nhân số nguyên để tránh dùng số thập phân (double) trong SQL.
-            // Sức chứa thực tế cần thiết: (Số người lớn * 2) + Số trẻ em
             var requiredDoubleCapacity = (request.Adult * 2) + request.Children;
 
-            var availableRoomsList = _context.Rooms
-                .Where(room => room.IsAvailable
-                               && (room.Capacity * 2) >= requiredDoubleCapacity
-                               && !_context.Bookings.Any(booking =>
-                                    booking.RoomId == room.Id
-                                    && arrival < booking.DepartureDate
-                                    && departure > booking.ArrivalDate))
-                .ToList();
+            // Đổi sang ToListAsync()
+            var availableRoomsList = await _context.Rooms
+    .Where(room => room.IsAvailable
+                   && (room.Capacity * 2) >= requiredDoubleCapacity
+                   && !_context.Bookings.Any(booking =>
+                        booking.RoomId == room.Id
+                        && booking.BookingStatus != "Cancelled" // <-- Thêm dòng này
+                        && booking.BookingStatus != "CheckedOut" // <-- Thêm dòng này
+                        && arrival < booking.DepartureDate
+                        && departure > booking.ArrivalDate))
+    .ToListAsync();
 
             return Ok(availableRoomsList);
         }
 
-
-
         [Authorize(Roles = "User")]
         [HttpPost("/api/bookings")]
-        public IActionResult BookRoom(BookingRequestDto request)
+        public async Task<IActionResult> BookRoom(BookingRequestDto request) // Thêm async Task<>
         {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr))
+                return Unauthorized(new { message = "Invalid Token" });
 
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-
-
-            //  Validate đầu vào cơ bản (Ngày và Số người)
             if (!request.DepartureDate.HasValue || !request.ArrivalDate.HasValue)
                 return BadRequest(new { message = "The Departure Date and Arrival Date are required." });
 
@@ -84,12 +67,11 @@ namespace LuxHotel.Api.Controllers
             if (request.Adult < 1)
                 return BadRequest(new { message = "The number of adults must be at least 1." });
 
-            //  Tìm phòng mà khách muốn đặt
-            var room = _context.Rooms.FirstOrDefault(x => x.Id == request.RoomId);
+            // Đổi sang FirstOrDefaultAsync
+            var room = await _context.Rooms.FirstOrDefaultAsync(x => x.Id == request.RoomId);
             if (room == null || !room.IsAvailable)
-                return NotFound(new { message = "Room not found or currently unavailable for booking." });
+                return NotFound(new { message = "Room not found or currently under maintenance." });
 
-            //  Kiểm tra sức chứa của phòng đó
             var requiredDoubleCapacity = (request.Adult * 2) + request.Children;
             if ((room.Capacity * 2) < requiredDoubleCapacity)
                 return BadRequest(new { message = "This room does not have enough capacity for the requested number of guests." });
@@ -97,129 +79,273 @@ namespace LuxHotel.Api.Controllers
             var arrival = request.ArrivalDate.Value;
             var departure = request.DepartureDate.Value;
 
-            //  Kiểm tra TRỰC TIẾP xem phòng NÀY có bị kẹt lịch không (Chỉ tốn 1 truy vấn siêu nhỏ)
-            bool isRoomBooked = _context.Bookings.Any(booking =>
-                booking.RoomId == room.Id &&
-                arrival < booking.DepartureDate &&
-                departure > booking.ArrivalDate);
+            // Đổi sang AnyAsync
+            bool isRoomBooked = await _context.Bookings.AnyAsync(booking =>
+             booking.RoomId == room.Id &&
+             booking.BookingStatus != "Cancelled" && // <-- Thêm dòng này
+             booking.BookingStatus != "CheckedOut" && // <-- Thêm dòng này
+             arrival < booking.DepartureDate &&
+             departure > booking.ArrivalDate);
 
             if (isRoomBooked)
                 return BadRequest(new { message = "This room is already booked for the selected dates." });
 
+            // BẮT ĐẦU TRANSACTION BẢO VỆ DỮ LIỆU
 
 
-            //  Tạo Booking
-            var totalNights = (departure - arrival).Days;
-
-            var newBooking = new Booking
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
             {
-                UserId = Guid.Parse(userId),
-                RoomId = room.Id,
-                ArrivalDate = arrival,
-                DepartureDate = departure,
-                Adult = request.Adult,
-                Children = request.Children,
-                TotalPrice = totalNights * room.PricePerNight,
-                BookingStatus = "Confirmed",
-                CreatedAt = DateTime.Now
-            };
+                var totalNights = (departure - arrival).Days;
+                var newBooking = new Booking
+                {
+                    UserId = Guid.Parse(userIdStr),
+                    RoomId = room.Id,
+                    ArrivalDate = arrival,
+                    DepartureDate = departure,
+                    Adult = request.Adult,
+                    Children = request.Children,
+                    TotalPrice = totalNights * room.PricePerNight,
+                    BookingStatus = "Confirmed",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Bookings.Add(newBooking);
+                await _context.SaveChangesAsync();
 
 
 
-            _context.Bookings.Add(newBooking);
-            room.IsAvailable = false;
-            _context.SaveChanges();
+                var newPayment = new Payment
+                {
+                    BookingId = newBooking.Id,
+                    Amount = newBooking.TotalPrice,
+                    PaymentMethod = "Cash",
+                    PaymentStatus = "Pending",
+                    TransactionId = $"{newBooking.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}",
+                    PaidAt = null,
+                    CreatedAt = DateTime.UtcNow
+                };
 
-            var newPayment = new Payment
+                _context.Payments.Add(newPayment);
+                await _context.SaveChangesAsync();
+
+                // Lưu thành công cả 2 bảng mới Commit
+                await transaction.CommitAsync();
+
+                var responseDto = new BookingResponseDTO
+                {
+                    Id = newBooking.Id,
+                    RoomId = newBooking.RoomId,
+                    ArrivalDate = newBooking.ArrivalDate,
+                    DepartureDate = newBooking.DepartureDate,
+                    Adult = newBooking.Adult,
+                    Children = newBooking.Children,
+                    TotalPrice = newBooking.TotalPrice,
+                    BookingStatus = newBooking.BookingStatus
+                };
+
+                return Ok(responseDto);
+            }
+            catch (Exception)
             {
-                BookingId = newBooking.Id,
-                Amount = newBooking.TotalPrice,
-                PaymentMethod = "Cash",
-                PaymentStatus = "Pending",
-                TransactionId = $"{newBooking.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}",
-                PaidAt = arrival,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Payments.Add(newPayment);
-            _context.SaveChanges();
-
-            var responseDto = new BookingResponseDTO
-            {
-                Id = newBooking.Id,
-                RoomId = newBooking.RoomId,
-                ArrivalDate = newBooking.ArrivalDate,
-                DepartureDate = newBooking.DepartureDate,
-                Adult = newBooking.Adult,
-                Children = newBooking.Children,
-                TotalPrice = newBooking.TotalPrice,
-                BookingStatus = newBooking.BookingStatus
-            };
-
-
-
-            return Ok(responseDto);
+                // Lỗi giữa chừng thì quay ngược lại, không lưu gì cả
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { message = "An error occurred while booking. Please try again." });
+            }
         }
 
         [Authorize(Roles = "User")]
         [HttpGet("/api/bookings/my")]
-        public IActionResult getAllMyBookings()
+        public async Task<IActionResult> GetAllMyBookings() // Thêm async Task<>
         {
-            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (_context.User.FirstOrDefault(u => u.Id == userId) == null)
+            // Xử lý chống crash nếu Token không hợp lệ
+            if (!Guid.TryParse(userIdStr, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid User ID in token." });
+            }
+
+            // Tối ưu query, chỉ cần check Any() thay vì lấy toàn bộ object
+            if (!await _context.User.AnyAsync(u => u.Id == userId))
             {
                 return NotFound(new { message = "User Not Found" });
             }
 
-            var myBookings = _context.Bookings
-        .Where(x => x.UserId == userId)
-        .Select(b => new BookingResponseDTO
-        {
-            Id = b.Id,
-            RoomId = b.RoomId,
-            ArrivalDate = b.ArrivalDate,
-            DepartureDate = b.DepartureDate,
-            Adult = b.Adult,
-            Children = b.Children,
-            TotalPrice = b.TotalPrice,
-            BookingStatus = b.BookingStatus,
-        })
-        .ToList();
+            // Đổi sang ToListAsync
+            var myBookings = await _context.Bookings
+                .Where(x => x.UserId == userId)
+                .Select(b => new BookingResponseDTO
+                {
+                    Id = b.Id,
+                    RoomId = b.RoomId,
+                    ArrivalDate = b.ArrivalDate,
+                    DepartureDate = b.DepartureDate,
+                    Adult = b.Adult,
+                    Children = b.Children,
+                    TotalPrice = b.TotalPrice,
+                    BookingStatus = b.BookingStatus,
+                })
+                .ToListAsync();
 
             return Ok(myBookings);
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpPatch("/api/toggle-room-status/{id}")] 
+        [HttpPatch("/api/toggle-room-status/{id}")]
         public async Task<IActionResult> ToggleRoomAvailableStatus(int id)
         {
-           
             var room = await _context.Rooms.FirstOrDefaultAsync(x => x.Id == id);
-
             if (room == null)
             {
                 return NotFound(new { message = "Room Not Found" });
             }
 
-           
-            // Khách chưa rời đi, hoặc sắp tới có khách tới ở)
-            bool isRoomBooked = await _context.Bookings.AnyAsync(booking =>
-                booking.RoomId == room.Id &&
-                booking.DepartureDate > DateTime.UtcNow);
+            // Lấy thời gian hiện tại để so sánh
+            var now = DateTime.UtcNow;
 
-     
-            if (isRoomBooked && room.IsAvailable)
+            // Kiểm tra xem phòng có ĐANG CÓ KHÁCH Ở THỰC TẾ ngay lúc này không
+            bool isRoomCurrentlyOccupied = await _context.Bookings.AnyAsync(booking =>
+                booking.RoomId == room.Id &&
+                booking.BookingStatus != "Cancelled" &&
+                booking.BookingStatus != "CheckedOut" &&
+                now >= booking.ArrivalDate &&            // Khách đã hoặc đang đến
+                now < booking.DepartureDate);            // Và chưa đến giờ rời đi
+
+            bool hasFutureBookings = await _context.Bookings.AnyAsync(booking =>
+            booking.RoomId == room.Id &&
+            booking.BookingStatus == "Confirmed" &&
+            booking.ArrivalDate >= now);
+
+            // Nếu đang có khách ở trong phòng mà Admin đòi khóa phòng thì mới chặn
+            if ((isRoomCurrentlyOccupied || hasFutureBookings) && room.IsAvailable)
             {
-                return BadRequest(new { message = "Cannot disable this room because it is currently booked for upcoming dates." });
+                return BadRequest(new
+                {
+                    message = "Cannot disable this room because a guest is currently occupying it right now."
+                });
             }
 
-            //  Toggle trạng thái 
+            // Toggle trạng thái hoạt động (Bảo trì <-> Sẵn sàng)
             room.IsAvailable = !room.IsAvailable;
-
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        [Authorize(Roles = "User")]
+        [HttpPatch("/api/bookings/{id}/cancel")]
+        public async Task<IActionResult> CancelBooking(Guid id)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            // Kiểm tra token
+            if (!Guid.TryParse(userIdStr, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid User ID in token." });
+            }
+
+            // Tìm đơn phòng
+            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
+            if (booking == null)
+            {
+                return NotFound(new { message = "Booking not found." });
+            }
+
+            // Bảo mật: Ngăn chặn User này dùng ID của Booking người khác để hủy trộm
+            if (booking.UserId != userId)
+            {
+                return Forbid(); // Trả về 403 Forbidden
+            }
+
+            // Chặn hủy nếu đơn đã ở trạng thái kết thúc
+            if (booking.BookingStatus == "Cancelled" || booking.BookingStatus == "CheckedOut")
+            {
+                return BadRequest(new { message = $"Cannot cancel a booking that is already {booking.BookingStatus}." });
+            }
+
+            // Chặn hủy nếu đã đến hoặc vượt quá ngày nhận phòng (ArrivalDate)
+            if (DateTime.Now >= booking.ArrivalDate)
+            {
+                return BadRequest(new { message = "Cannot cancel the booking on or after the arrival date." });
+            }
+
+            // Cập nhật trạng thái
+            booking.BookingStatus = "Cancelled";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Booking has been cancelled successfully." });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPatch("/api/bookings/{id}/checkout")]
+        public async Task<IActionResult> CheckoutBooking(Guid id)
+        {
+            // Tìm hóa đơn của booking này
+            var payment = await _context.Payments.FirstOrDefaultAsync(p => p.BookingId == id);
+            if (payment == null || payment.PaymentStatus != "Completed")
+            {
+                return BadRequest(new { message = "Cannot checkout. This booking has not been fully paid yet." });
+            }
+
+
+            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
+            if (booking == null)
+            {
+                return NotFound(new { message = "Booking not found." });
+            }
+
+            // Nếu đơn đã hủy hoặc đã checkout rồi thì báo lỗi
+            if (booking.BookingStatus == "Cancelled" || booking.BookingStatus == "CheckedOut")
+            {
+                return BadRequest(new { message = $"Cannot checkout. This booking is already {booking.BookingStatus}." });
+            }
+
+            // Nếu trạng thái đang là Confirmed thì tiến hành Checkout
+            if (booking.BookingStatus != "Confirmed")
+            {
+                return BadRequest(new { message = "Only 'Confirmed' bookings can be checked out." });
+            }
+
+            booking.BookingStatus = "CheckedOut";
+
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Guest has successfully checked out. The room is now available." });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPatch("/api/bookings/{id}/complete-payment")]
+        public async Task<IActionResult> CompletePayment(Guid id)
+        {
+            //  Tìm thông tin thanh toán của đơn đặt phòng này
+            var payment = await _context.Payments.FirstOrDefaultAsync(p => p.BookingId == id);
+            if (payment == null)
+            {
+                return NotFound(new { message = "Payment record for this booking not found." });
+            }
+
+            //  Nếu đã thanh toán thành công trước đó rồi thì chặn xử lý lại (Idempotency)
+            if (payment.PaymentStatus == "Completed")
+            {
+                return BadRequest(new { message = "This payment has already been completed." });
+            }
+
+            //  Cập nhật trạng thái và lưu mốc thời gian thanh toán thực tế bằng UTC
+            payment.PaymentStatus = "Completed";
+            payment.PaidAt = DateTime.UtcNow;
+
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Payment has been completed successfully.",
+                bookingId = payment.BookingId,
+                paymentStatus = payment.PaymentStatus,
+                paidAt = payment.PaidAt
+            });
         }
     }
 }

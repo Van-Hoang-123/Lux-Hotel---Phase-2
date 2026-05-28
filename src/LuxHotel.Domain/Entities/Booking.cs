@@ -40,7 +40,7 @@ namespace LuxHotel.Domain.Entities
 
         [Required]
         [StringLength(50)]
-        public string BookingStatus { get; set; } = "Pending"; // Pending, Confirmed, Cancelled
+        public string BookingStatus { get; set; } // Confirmed, Cancelled, CheckedOut
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

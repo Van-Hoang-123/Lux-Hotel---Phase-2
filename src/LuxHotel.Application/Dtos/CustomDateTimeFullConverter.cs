@@ -8,8 +8,8 @@ namespace LuxHotel.Application.Converters // Bạn cho vào namespace phù hợp
     public class CustomDateTimeFullConverter : JsonConverter<DateTime?>
     {
         // Dùng FFFFFFF (viết hoa) để nhận linh hoạt từ 0 đến 7 chữ số mili giây
-        private readonly string _parseFormat = "dd-MM-yyyy HH:mm:ss.FFFFFFF";
-        private readonly string _writeFormat = "dd-MM-yyyy HH:mm:ss.fffffff";
+        private readonly string _parseFormat = "dd-MM-yyyy";
+        private readonly string _writeFormat = "dd-MM-yyyy";
 
         // Chiều Nhận (Đọc từ FE gửi lên)
         public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -33,7 +33,7 @@ namespace LuxHotel.Application.Converters // Bạn cho vào namespace phù hợp
                 return date;
             }
 
-            throw new JsonException($"Định dạng ngày giờ không hợp lệ. Kỳ vọng dạng: dd-MM-yyyy HH:mm:ss.fffffff");
+            throw new JsonException($"Định dạng ngày giờ không hợp lệ. Kỳ vọng dạng: dd-MM-yyyy");
         }
 
         // Chiều Trả (Trả dữ liệu về lại cho FE nếu cần)
