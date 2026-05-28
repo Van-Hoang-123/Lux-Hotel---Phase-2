@@ -12,11 +12,11 @@ namespace LuxHotel.Domain.Entities
     {
         [Required]
         [StringLength(150)]
-        public string FullName { get; set; }
+        public string FullName { get; set; } = string.Empty;
 
         [Required]
         [StringLength(20)]
-        public string Role { get; set; } // "Admin" hoặc "User"
+        public string Role { get; set; } = "User"; // "Admin" hoặc "User"
 
         // THỂ HIỆN RELATIONSHIP: Một User có thể có nhiều đơn đặt phòng (Mối quan hệ 1 - Nhiều)
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
