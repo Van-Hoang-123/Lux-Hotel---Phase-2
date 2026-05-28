@@ -28,6 +28,11 @@ function buildApiCandidates() {
 
 const apiCandidates = buildApiCandidates();
 let apiBaseUrl = apiCandidates[0] || "/api";
+const authStorageKey = "luxHotelAuth";
+const authEndpointPaths = {
+  login: ["/auth/login", "/Auth/login"],
+  register: ["/auth/register", "/Auth/register"],
+};
 
 async function apiFetch(path, options = {}) {
   const orderedCandidates = [...new Set([apiBaseUrl, ...apiCandidates])];
@@ -64,6 +69,20 @@ async function readJson(response) {
   }
 }
 
+async function apiFetchFirst(paths, options = {}) {
+  let lastError;
+
+  for (const path of paths) {
+    try {
+      return await apiFetch(path, options);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Cannot connect to API.");
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -97,6 +116,59 @@ function formatGuests(adults, children) {
   const parts = [plural(adults, "adult")];
   if (children > 0) parts.push(plural(children, "child", "children"));
   return parts.join(", ");
+}
+
+function authHeader() {
+  const auth = getStoredAuth();
+  return auth?.token ? { Authorization: `Bearer ${auth.token}` } : {};
+}
+
+function getStoredAuth() {
+  try {
+    return JSON.parse(localStorage.getItem(authStorageKey) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function storeAuth(data) {
+  const user = data?.user || data?.User || {};
+  const token = data?.token || data?.Token || "";
+  const expiresAtUtc = data?.expiresAtUtc || data?.ExpiresAtUtc || "";
+
+  if (!token) return null;
+
+  const auth = {
+    token,
+    expiresAtUtc,
+    user: {
+      id: user.id || user.Id || "",
+      email: user.email || user.Email || "",
+      fullName: user.fullName || user.FullName || "",
+      roles: user.roles || user.Roles || [],
+    },
+  };
+
+  localStorage.setItem(authStorageKey, JSON.stringify(auth));
+  return auth;
+}
+
+function clearStoredAuth() {
+  localStorage.removeItem(authStorageKey);
+}
+
+function formatApiError(data, fallback) {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  if (data.message || data.Message) return data.message || data.Message;
+  const errors = data.errors || data.Errors;
+
+  if (Array.isArray(errors)) return errors.join(" ");
+  if (errors && typeof errors === "object") {
+    return Object.values(errors).flat().filter(Boolean).join(" ") || fallback;
+  }
+
+  return fallback;
 }
 
 const fallbackRooms = [
@@ -510,6 +582,30 @@ function setBookingStatus(type, message) {
   status.textContent = message || "";
 }
 
+function setAuthStatus(type, message) {
+  const status = $("#authStatus");
+  if (!status) return;
+  status.className = `form-status ${type ? `is-visible ${type}` : ""}`;
+  status.textContent = message || "";
+}
+
+function updateAccountSummary(auth = getStoredAuth()) {
+  const summary = $("#accountSummary");
+  const logoutButton = $("#logoutButton");
+  if (!summary || !logoutButton) return;
+
+  const user = auth?.user;
+  if (auth?.token && user) {
+    const name = user.fullName || user.email || "guest";
+    summary.textContent = `Welcome back, ${name}.`;
+    logoutButton.hidden = false;
+    return;
+  }
+
+  summary.textContent = "Sign in to keep your booking profile ready before arrival.";
+  logoutButton.hidden = true;
+}
+
 function validateBookingDates(arrival, departure) {
   const missingArrival = !arrival;
   const missingDeparture = !departure;
@@ -534,6 +630,97 @@ function validateBookingDates(arrival, departure) {
   }
 
   return true;
+}
+
+function switchAuthPanel(mode) {
+  $$("[data-auth-tab]").forEach((button) => {
+    const isActive = button.dataset.authTab === mode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  $$("[data-auth-panel]").forEach((panel) => {
+    const isActive = panel.dataset.authPanel === mode;
+    panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
+  });
+
+  setAuthStatus("", "");
+}
+
+async function submitAuthForm(form, mode) {
+  const submitButton = form.querySelector('button[type="submit"]');
+  const formData = new FormData(form);
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "");
+  const fullName = String(formData.get("fullName") || "").trim();
+
+  if (!email || !email.includes("@") || !password || (mode === "register" && !fullName)) {
+    setAuthStatus("error", "Fill in the required account fields.");
+    return;
+  }
+
+  submitButton.disabled = true;
+  submitButton.textContent = mode === "login" ? "Logging in..." : "Creating...";
+
+  try {
+    const payload = mode === "login" ? { email, password } : { email, password, fullName };
+    const response = await apiFetchFirst(authEndpointPaths[mode], {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      setAuthStatus("error", formatApiError(data, mode === "login" ? "Login failed." : "Registration failed."));
+      return;
+    }
+
+    const auth = storeAuth(data);
+    if (!auth) {
+      setAuthStatus("warning", "Account response did not include an access token.");
+      return;
+    }
+
+    updateAccountSummary(auth);
+    form.reset();
+    setAuthStatus("success", mode === "login" ? "Logged in successfully." : "Account created successfully.");
+  } catch (error) {
+    console.error("Auth API error:", error);
+    setAuthStatus("error", "Cannot connect to the backend auth API.");
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = mode === "login" ? "Login" : "Create account";
+  }
+}
+
+function setupAuthForms() {
+  if (!$("#loginForm") || !$("#registerForm")) return;
+
+  updateAccountSummary();
+
+  $$("[data-auth-tab]").forEach((button) => {
+    button.addEventListener("click", () => switchAuthPanel(button.dataset.authTab));
+  });
+
+  $("#loginForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitAuthForm(event.currentTarget, "login");
+  });
+
+  $("#registerForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitAuthForm(event.currentTarget, "register");
+  });
+
+  $("#logoutButton").addEventListener("click", () => {
+    clearStoredAuth();
+    updateAccountSummary(null);
+    setAuthStatus("success", "Logged out.");
+  });
 }
 
 function setupForms() {
@@ -565,6 +752,7 @@ function setupForms() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...authHeader(),
         },
         body: JSON.stringify({
           roomId,
@@ -685,7 +873,7 @@ function setupMagneticButtons() {
   if (!gsap || reducedMotion || coarsePointer) return;
 
   const buttons = $$(
-    ".primary-btn, .ghost-btn, .nav-cta, .booking-form button, .newsletter-row button, .experience-actions button, .hero-controls button"
+    ".primary-btn, .ghost-btn, .nav-cta, .booking-form button, .newsletter-row button, .auth-tabs button, .auth-form button, .auth-logout, .experience-actions button, .hero-controls button"
   );
 
   buttons.forEach((button) => {
@@ -743,7 +931,7 @@ function setupAnimations() {
     },
   });
 
-  gsap.utils.toArray(".intro-grid > *, .section-heading, .experience-content").forEach((item) => {
+  gsap.utils.toArray(".intro-grid > *, .section-heading, .experience-content, .account-copy, .auth-shell").forEach((item) => {
     gsap.from(item, {
       y: 34,
       opacity: 0,
@@ -785,6 +973,7 @@ setupMenu();
 setupHeader();
 setupHeroSlider();
 setupExperience();
+setupAuthForms();
 setupForms();
 setupBackToTop();
 setupRoomModal();
