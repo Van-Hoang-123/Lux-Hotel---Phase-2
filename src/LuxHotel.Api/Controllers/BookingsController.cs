@@ -127,6 +127,7 @@ namespace LuxHotel.Api.Controllers
 
 
             _context.Bookings.Add(newBooking);
+            room.IsAvailable = false;
             _context.SaveChanges();
 
             var newPayment = new Payment
@@ -187,6 +188,29 @@ namespace LuxHotel.Api.Controllers
         .ToList();
 
             return Ok(myBookings);
+        }
+
+        [HttpPatch("/toogleRoomAvailableStatus/{id}")]
+        public IActionResult toogleRoomAvailableStatus(int id)
+        {
+            var Room = _context.Rooms.FirstOrDefault(x => x.Id == id);
+
+            if(Room == null)
+            {
+                return NotFound(new { message = "Room Not Found" });
+            }
+
+            if (Room.IsAvailable)
+            {
+                Room.IsAvailable = false;
+            }
+            else
+            {
+                Room.IsAvailable = true;
+            }
+
+            _context.SaveChanges();
+            return NoContent();
         }
 
     }
