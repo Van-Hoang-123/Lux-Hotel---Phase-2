@@ -457,7 +457,13 @@ select:focus {
 }
 
 .field-error {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
     color: #b42318;
     font-size: 12px;
     font-weight: 700;
@@ -499,6 +505,86 @@ select:focus {
     border-color: rgba(180, 35, 24, 0.24);
     background: rgba(180, 35, 24, 0.08);
     color: #b42318;
+}
+
+.booking-status,
+.booking-status.is-visible {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    padding: 0;
+    border: 0;
+    margin: 0;
+}
+
+.toast-stack {
+    position: fixed;
+    top: 88px;
+    left: 50%;
+    z-index: 140;
+    width: min(430px, calc(100vw - 32px));
+    display: grid;
+    gap: 10px;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+.site-toast {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    border: 1px solid rgba(23, 19, 15, 0.12);
+    border-radius: 8px;
+    padding: 14px 14px 14px 16px;
+    background: rgba(255, 253, 248, 0.98);
+    box-shadow: rgba(23, 19, 15, 0.18) 0 18px 46px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.45;
+    opacity: 0;
+    pointer-events: auto;
+    transform: translateY(-12px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.site-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.site-toast.error {
+    border-color: rgba(180, 35, 24, 0.24);
+    background: #fff8f7;
+    color: #9f2318;
+}
+
+.site-toast.success {
+    border-color: rgba(17, 122, 72, 0.24);
+    background: #f4fbf7;
+    color: #0f6f43;
+}
+
+.site-toast.warning {
+    border-color: rgba(185, 152, 103, 0.34);
+    background: #fffaf0;
+    color: #79572a;
+}
+
+.site-toast button {
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(23, 19, 15, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: currentColor;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
 }
 
 .section-pad {

@@ -29,6 +29,7 @@ function buildApiCandidates() {
 const apiCandidates = buildApiCandidates();
 let apiBaseUrl = apiCandidates[0] || "/api";
 const authStorageKey = "luxHotelAuth";
+const toastTimeoutMs = 4400;
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
@@ -570,16 +571,45 @@ function setupExperience() {
 }
 
 function showError(id, visible, message) {
+  updateFieldError(id, visible, message);
+  if (visible && message) showToast("error", message);
+}
+
+function updateFieldError(id, visible, message) {
   const element = $(id);
   if (!element) return;
   if (message) element.textContent = message;
   element.classList.toggle("is-visible", visible);
 }
 
+function showToast(type, message) {
+  const stack = $("#toastStack");
+  if (!stack || !message) return;
+
+  const toast = document.createElement("div");
+  toast.className = `site-toast ${type || "warning"}`;
+  toast.setAttribute("role", type === "error" ? "alert" : "status");
+  toast.innerHTML = `
+    <span>${escapeHtml(message)}</span>
+    <button type="button" aria-label="Close notification">x</button>
+  `;
+
+  const close = () => {
+    toast.classList.remove("is-visible");
+    window.setTimeout(() => toast.remove(), 220);
+  };
+
+  toast.querySelector("button").addEventListener("click", close);
+  stack.append(toast);
+  window.requestAnimationFrame(() => toast.classList.add("is-visible"));
+  window.setTimeout(close, toastTimeoutMs);
+}
+
 function setBookingStatus(type, message) {
   const status = $("#bookingStatus");
   status.className = `form-status ${type ? `is-visible ${type}` : ""}`;
   status.textContent = message || "";
+  if (type && message) showToast(type, message);
 }
 
 function setAuthStatus(type, message) {
@@ -609,10 +639,13 @@ function updateAccountSummary(auth = getStoredAuth()) {
 function validateBookingDates(arrival, departure) {
   const missingArrival = !arrival;
   const missingDeparture = !departure;
-  showError("#arrivalDateError", missingArrival, "Choose an arrival date.");
-  showError("#departureDateError", missingDeparture, "Choose a departure date.");
+  updateFieldError("#arrivalDateError", missingArrival, "Choose an arrival date.");
+  updateFieldError("#departureDateError", missingDeparture, "Choose a departure date.");
 
-  if (missingArrival || missingDeparture) return false;
+  if (missingArrival || missingDeparture) {
+    showToast("error", missingArrival ? "Choose an arrival date." : "Choose a departure date.");
+    return false;
+  }
 
   const arrivalDate = new Date(`${arrival}T00:00:00`);
   const departureDate = new Date(`${departure}T00:00:00`);
@@ -620,12 +653,14 @@ function validateBookingDates(arrival, departure) {
   today.setHours(0, 0, 0, 0);
 
   if (arrivalDate < today) {
-    showError("#arrivalDateError", true, "Arrival date cannot be in the past.");
+    updateFieldError("#arrivalDateError", true, "Arrival date cannot be in the past.");
+    showToast("error", "Arrival date cannot be in the past.");
     return false;
   }
 
   if (departureDate <= arrivalDate) {
-    showError("#departureDateError", true, "Departure must be after arrival.");
+    updateFieldError("#departureDateError", true, "Departure must be after arrival.");
+    showToast("error", "Departure must be after arrival.");
     return false;
   }
 
