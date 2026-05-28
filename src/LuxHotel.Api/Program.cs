@@ -69,7 +69,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("UserOnly", p => p.RequireRole("User"));
 });
 
-builder.Services.AddValidatorsFromAssemblyContaining<BookingValidator>();
+//builder.Services.AddValidatorsFromAssemblyContaining<BookingValidator>(); * REMOVED BY QuangTu
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
 
