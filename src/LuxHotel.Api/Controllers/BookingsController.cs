@@ -17,6 +17,12 @@ namespace LuxHotel.Api.Controllers
                 });
             }
 
+            if (request.Adults <= 0)
+                return BadRequest(new
+                { 
+                    message = "At least one adult is required." 
+                });
+
             return Ok(new
             {
                 success = true,
