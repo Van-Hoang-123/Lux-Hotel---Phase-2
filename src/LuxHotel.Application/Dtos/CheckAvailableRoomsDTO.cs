@@ -1,18 +1,14 @@
-﻿using System;
+﻿using LuxHotel.Application.Converters;
 using System.Text.Json.Serialization;
-using LuxHotel.Application.Converters; // Import converter ở trên vào
 
-namespace LuxHotel.Application.Dtos
+namespace LuxHotel.Application.Dtos;
+
+public class CheckAvailableRooomsDTO
 {
-    public class CheckAvailableRooomsDTO
-    {
-        [JsonConverter(typeof(CustomDateTimeFullConverter))]
-        public DateTime? ArrivalDate { get; set; }
-
-        [JsonConverter(typeof(CustomDateTimeFullConverter))]
-        public DateTime? DepartureDate { get; set; }
-
-        public int Adult { get; set; }
-        public int Children { get; set; }
-    }
+    [JsonConverter(typeof(CustomDateTimeFullConverter))]
+    public DateTime? ArrivalDate { get; set; }
+    [JsonConverter(typeof(CustomDateTimeFullConverter))]
+    public DateTime? DepartureDate { get; set; }
+    public int Adult { get; set; }
+    public int Children { get; set; }
 }

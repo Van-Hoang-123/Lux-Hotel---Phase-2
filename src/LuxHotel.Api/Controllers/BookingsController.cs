@@ -65,7 +65,7 @@ namespace LuxHotel.Api.Controllers
 
 
 
-        //[Authorize(Roles = "User")]
+        [Authorize(Roles = "User")]
         [HttpPost("/api/bookings")]
         public IActionResult BookRoom(BookingRequestDto request)
         {
@@ -128,6 +128,19 @@ namespace LuxHotel.Api.Controllers
 
             _context.Bookings.Add(newBooking);
             _context.SaveChanges();
+
+            var newPayment = new Payment
+            {
+                BookingId = newBooking.Id,
+                Amount = newBooking.TotalPrice,
+                PaymentMethod = "Cash",
+                PaymentStatus = "Pending",
+                TransactionId = $"{newBooking.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}",
+                PaidAt = arrival,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Payments.Add(newPayment);
 
             var responseDto = new BookingResponseDTO
             {
