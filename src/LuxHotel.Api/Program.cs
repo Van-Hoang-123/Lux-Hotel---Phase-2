@@ -25,7 +25,7 @@ builder.Services.AddDbContext<LuxHotelDbContext>(options =>
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 
 builder.Services
-    .AddIdentity<User, IdentityRole<Guid>>(options =>
+    .AddIdentityCore<User>(options =>
     {
         options.User.RequireUniqueEmail = true;
         options.Password.RequiredLength = 8;
@@ -34,6 +34,7 @@ builder.Services
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = false;
     })
+    .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<LuxHotelDbContext>()
     .AddDefaultTokenProviders();
 
