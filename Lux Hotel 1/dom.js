@@ -30,6 +30,7 @@ const apiCandidates = buildApiCandidates();
 let apiBaseUrl = apiCandidates[0] || "/api";
 const authStorageKey = "luxHotelAuth";
 const toastTimeoutMs = 4400;
+const maxGuestCount = 20;
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
@@ -249,7 +250,37 @@ function formatApiError(data, fallback) {
     return Object.values(errors).flat().filter(Boolean).join(" ") || fallback;
   }
 
-  return fallback;
+  return data.title || data.Title || fallback;
+}
+
+function readBoolean(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (value.toLowerCase() === "true") return true;
+    if (value.toLowerCase() === "false") return false;
+  }
+  return null;
+}
+
+function formatBookingResponse(data) {
+  if (!data) {
+    return {
+      type: "warning",
+      message: "Availability checked, but the backend did not return details.",
+    };
+  }
+
+  const isAvailable = readBoolean(data?.isAvailable ?? data?.IsAvailable ?? data?.available ?? data?.Available);
+  const success = readBoolean(data?.success ?? data?.Success ?? data?.succeeded ?? data?.Succeeded);
+  const isNegative = isAvailable === false || success === false;
+  const message = data?.message || data?.Message || (isNegative ? "Room is not available." : "Room is available.");
+  const estimatedTotal = data?.estimatedTotalPrice ?? data?.EstimatedTotalPrice ?? data?.totalPrice ?? data?.TotalPrice;
+  const total = estimatedTotal !== null && estimatedTotal !== undefined && estimatedTotal !== "" ? ` Estimated total: ${formatMoney(estimatedTotal)}.` : "";
+
+  return {
+    type: isNegative ? "warning" : "success",
+    message: `${message}${total}`,
+  };
 }
 
 const fallbackRooms = [
@@ -767,9 +798,11 @@ function validateBookingDates(arrival, departure) {
   return true;
 }
 
-function readGuestCount(selector, fallbackValue) {
-  const value = Number.parseInt($(selector).value, 10);
-  return Number.isFinite(value) ? value : fallbackValue;
+function readGuestCount(selector) {
+  const rawValue = $(selector).value.trim();
+  if (!rawValue) return Number.NaN;
+  const value = Number(rawValue);
+  return Number.isInteger(value) ? value : Number.NaN;
 }
 
 function validateGuestCounts(adults, children) {
@@ -778,8 +811,8 @@ function validateGuestCounts(adults, children) {
     return false;
   }
 
-  if (adults > 10) {
-    showToast("error", "Adults must be 10 or fewer.");
+  if (adults > maxGuestCount) {
+    showToast("error", `Adults must be ${maxGuestCount} or fewer.`);
     return false;
   }
 
@@ -788,8 +821,8 @@ function validateGuestCounts(adults, children) {
     return false;
   }
 
-  if (children > 10) {
-    showToast("error", "Children must be 10 or fewer.");
+  if (children > maxGuestCount) {
+    showToast("error", `Children must be ${maxGuestCount} or fewer.`);
     return false;
   }
 
@@ -797,12 +830,44 @@ function validateGuestCounts(adults, children) {
 }
 
 function normalizeGuestCountInput(input, min, max) {
-  const value = Number.parseInt(input.value, 10);
-  if (!Number.isFinite(value)) {
-    input.value = String(min);
-    return;
-  }
+  if (!input.value.trim()) return;
+  const value = Number(input.value);
+  if (!Number.isInteger(value)) return;
   input.value = String(Math.min(max, Math.max(min, value)));
+}
+
+function toDateInputValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function setupDateBounds() {
+  const arrival = $("#arrivalDate");
+  const departure = $("#departureDate");
+  const todayValue = toDateInputValue(new Date());
+  arrival.min = todayValue;
+  departure.min = todayValue;
+
+  arrival.addEventListener("change", () => {
+    if (!arrival.value) {
+      departure.min = todayValue;
+      return;
+    }
+
+    const nextDay = addDays(new Date(`${arrival.value}T00:00:00`), 1);
+    departure.min = toDateInputValue(nextDay);
+    if (departure.value && departure.value <= arrival.value) {
+      departure.value = "";
+    }
+  });
 }
 
 function switchAuthPanel(mode) {
@@ -902,13 +967,15 @@ function setupAuthForms() {
 
 function setupForms() {
   const roomSelect = $("#roomSelect");
+  setupDateBounds();
+
   roomSelect.addEventListener("change", () => {
     selectedRoomId = Number(roomSelect.value || rooms[0]?.id || 1);
     setBookingStatus("", "");
   });
 
-  $("#adult").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 1, 10));
-  $("#children").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 0, 10));
+  $("#adult").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount));
+  $("#children").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount));
 
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -917,8 +984,8 @@ function setupForms() {
     const submitButton = form.querySelector('button[type="submit"]');
     const arrival = $("#arrivalDate").value;
     const departure = $("#departureDate").value;
-    const adultCount = readGuestCount("#adult", 1);
-    const childCount = readGuestCount("#children", 0);
+    const adultCount = readGuestCount("#adult");
+    const childCount = readGuestCount("#children");
     const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId, 10);
 
     setBookingStatus("", "");
@@ -949,12 +1016,12 @@ function setupForms() {
 
       const data = await readJson(response);
       if (!response.ok) {
-        setBookingStatus("error", data?.message || "Could not check availability.");
+        setBookingStatus("error", formatApiError(data, "Could not check availability."));
         return;
       }
 
-      const total = data?.estimatedTotalPrice ? ` Estimated total: ${formatMoney(data.estimatedTotalPrice)}.` : "";
-      setBookingStatus(data?.isAvailable ? "success" : "warning", `${data?.message || "Availability checked."}${total}`);
+      const result = formatBookingResponse(data);
+      setBookingStatus(result.type, result.message);
     } catch (error) {
       console.error("Booking API error:", error);
       setBookingStatus("error", "Cannot connect to the backend API. Start the backend and try again.");
