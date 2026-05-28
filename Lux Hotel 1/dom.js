@@ -29,12 +29,276 @@ function buildApiCandidates() {
 const apiCandidates = buildApiCandidates();
 let apiBaseUrl = apiCandidates[0] || "/api";
 const authStorageKey = "luxHotelAuth";
+const languageStorageKey = "luxHotelLanguage";
+const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
   profile: ["/auth/profile", "/auth/me", "/users/profile", "/users/me", "/profile"],
+};
+const supportedLanguages = ["en", "vi"];
+let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageStorageKey))
+  ? localStorage.getItem(languageStorageKey)
+  : "en";
+let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
+
+const translations = {
+  en: {
+    "brand.home": "Lux Hotel home",
+    "nav.rooms": "Rooms",
+    "nav.dining": "Dining",
+    "nav.amenities": "Amenities",
+    "nav.gallery": "Gallery",
+    "nav.journal": "Journal",
+    "nav.account": "Account",
+    "nav.reserve": "Reserve",
+    "nav.preferences": "Display preferences",
+    "nav.language": "Language",
+    "nav.openMenu": "Open menu",
+    "theme.day": "Day",
+    "theme.night": "Night",
+    "theme.switchToDay": "Switch to day mode",
+    "theme.switchToNight": "Switch to night mode",
+    "common.prev": "Prev",
+    "common.next": "Next",
+    "common.close": "Close",
+    "common.verifiedGuest": "Verified guest",
+    "hero.eyebrow": "Amelia Island, Panama",
+    "hero.title": "A quieter kind of luxury.",
+    "hero.copy": "Coastal suites, thoughtful dining, and island calm within minutes of the bay.",
+    "hero.check": "Check availability",
+    "hero.explore": "Explore rooms",
+    "hero.chipVillas": "Ocean-facing villas",
+    "hero.chipDining": "Private dining",
+    "hero.chipConcierge": "Island concierge",
+    "hero.prevAria": "Previous hero image",
+    "hero.nextAria": "Next hero image",
+    "booking.eyebrow": "Reservations",
+    "booking.title": "Plan your stay.",
+    "booking.room": "Room",
+    "booking.arrival": "Arrival",
+    "booking.departure": "Departure",
+    "booking.adults": "Adults",
+    "booking.children": "Children",
+    "booking.search": "Search rooms",
+    "booking.chooseRoom": "Choose room",
+    "booking.checking": "Checking...",
+    "booking.availableFallback": "Room is available.",
+    "booking.unavailableFallback": "Room is not available.",
+    "booking.emptyResponse": "Availability checked, but the backend did not return details.",
+    "booking.estimatedTotal": " Estimated total: {{total}}.",
+    "booking.checkFailed": "Could not check availability.",
+    "booking.connectError": "Cannot connect to the backend API. Start the backend and try again.",
+    "intro.eyebrow": "Panama's finest hotel",
+    "intro.title": "Golden-hour rooms, bay air, and a slower rhythm.",
+    "intro.copyOne": "Make memories at Lux Hotel, Amelia Island, where southern charm, quiet scenery, and casually elegant surroundings shape a calmer beachfront stay.",
+    "intro.copyTwo": "Recently renewed rooms, organic dining, spa rituals, and personal concierge service make the resort feel polished without becoming loud.",
+    "intro.imageAlt": "Lux Hotel lounge and island view",
+    "rooms.eyebrow": "Accommodation",
+    "rooms.title": "Suites and villas with room to breathe.",
+    "rooms.defaultTitle": "Lux Hotel Room",
+    "rooms.defaultCopy": "A refined room for a quieter coastal stay.",
+    "rooms.defaultView": "Garden view",
+    "rooms.priceFrom": "From {{price}} / night",
+    "rooms.viewDetails": "View details",
+    "rooms.viewDetailsAria": "View {{room}} details",
+    "experience.eyebrow": "Dining & Spa",
+    "experience.book": "Book now",
+    "amenities.eyebrow": "Vacation at ease",
+    "amenities.title": "Every detail handled before you ask.",
+    "gallery.eyebrow": "Gallery",
+    "gallery.title": "Small scenes from a quieter stay.",
+    "gallery.openAria": "Open {{title}}",
+    "reviews.eyebrow": "Guest notes",
+    "reviews.title": "Quiet service. Clear memories.",
+    "journal.eyebrow": "Journal",
+    "journal.title": "Stories from the island.",
+    "journal.defaultTitle": "Lux Hotel Journal",
+    "journal.defaultTag": "Journal",
+    "journal.defaultCopy": "Stories from the island.",
+    "account.eyebrow": "Guest account",
+    "account.title": "Manage your Lux Hotel stay.",
+    "account.summarySignedOut": "Sign in to keep your booking profile ready before arrival.",
+    "account.summarySignedIn": "Welcome back, {{name}}.",
+    "account.formsAria": "Guest account forms",
+    "account.login": "Login",
+    "account.register": "Register",
+    "account.email": "Email",
+    "account.password": "Password",
+    "account.fullName": "Full name",
+    "account.confirmPassword": "Confirm password",
+    "account.phone": "Phone number",
+    "account.createAccount": "Create account",
+    "account.signedInAs": "Signed in as",
+    "account.guest": "Guest",
+    "account.ready": "Guest account ready",
+    "account.logout": "Logout",
+    "account.loggingIn": "Logging in...",
+    "account.creating": "Creating...",
+    "account.required": "Fill in the required account fields.",
+    "account.passwordMismatch": "Confirm password must match password.",
+    "account.loginFailed": "Login failed.",
+    "account.registerFailed": "Registration failed.",
+    "account.missingToken": "Account response did not include an access token.",
+    "account.loggedInAs": "Logged in as {{name}}.",
+    "account.createdFor": "Account created for {{name}}.",
+    "account.connectError": "Cannot connect to the backend auth API.",
+    "account.loggedOut": "Logged out.",
+    "footer.location": "Amelia Island, Panama",
+    "footer.note": "Southern charm, quiet scenery, and casually elegant surroundings near the bay.",
+    "footer.contact": "Contact",
+    "footer.navigation": "Footer navigation",
+    "footer.quickLinks": "Quick links",
+    "footer.home": "Home",
+    "footer.terms": "Terms & Conditions",
+    "footer.faq": "FAQ",
+    "footer.newsletter": "Don't miss any updates",
+    "footer.emailPlaceholder": "Email address",
+    "footer.signUp": "Sign up now",
+    "footer.bottom": "© Built with pride and care by ThemeBubble. All rights reserved.",
+    "footer.goTop": "Go to top",
+    "modal.closeRoom": "Close room details",
+    "modal.reserve": "Reserve this stay",
+    "modal.closeGallery": "Close gallery image",
+    "errors.arrivalRequired": "Choose an arrival date.",
+    "errors.departureRequired": "Choose a departure date.",
+    "errors.arrivalPast": "Arrival date cannot be in the past.",
+    "errors.departureAfterArrival": "Departure must be after arrival.",
+    "errors.adultRequired": "At least one adult is required.",
+    "errors.adultsMax": "Adults must be {{max}} or fewer.",
+    "errors.childrenNegative": "Children cannot be negative.",
+    "errors.childrenMax": "Children must be {{max}} or fewer.",
+    "errors.emailRequired": "Enter your email.",
+  },
+  vi: {
+    "brand.home": "Trang chủ Lux Hotel",
+    "nav.rooms": "Phòng",
+    "nav.dining": "Ẩm thực",
+    "nav.amenities": "Tiện ích",
+    "nav.gallery": "Bộ sưu tập",
+    "nav.journal": "Nhật ký",
+    "nav.account": "Tài khoản",
+    "nav.reserve": "Đặt phòng",
+    "nav.preferences": "Tùy chọn hiển thị",
+    "nav.language": "Ngôn ngữ",
+    "nav.openMenu": "Mở menu",
+    "theme.day": "Sáng",
+    "theme.night": "Tối",
+    "theme.switchToDay": "Chuyển sang chế độ sáng",
+    "theme.switchToNight": "Chuyển sang chế độ tối",
+    "common.prev": "Trước",
+    "common.next": "Sau",
+    "common.close": "Đóng",
+    "common.verifiedGuest": "Khách đã xác thực",
+    "hero.eyebrow": "Đảo Amelia, Panama",
+    "hero.title": "Một kiểu sang trọng thật yên tĩnh.",
+    "hero.copy": "Phòng suite ven biển, ẩm thực tinh tế và sự bình yên của đảo chỉ cách vịnh vài phút.",
+    "hero.check": "Kiểm tra phòng",
+    "hero.explore": "Xem phòng",
+    "hero.chipVillas": "Biệt thự hướng biển",
+    "hero.chipDining": "Bữa tối riêng",
+    "hero.chipConcierge": "Dịch vụ đảo",
+    "hero.prevAria": "Ảnh hero trước",
+    "hero.nextAria": "Ảnh hero tiếp theo",
+    "booking.eyebrow": "Đặt phòng",
+    "booking.title": "Lên kế hoạch nghỉ dưỡng.",
+    "booking.room": "Phòng",
+    "booking.arrival": "Ngày đến",
+    "booking.departure": "Ngày đi",
+    "booking.adults": "Người lớn",
+    "booking.children": "Trẻ em",
+    "booking.search": "Tìm phòng",
+    "booking.chooseRoom": "Chọn phòng",
+    "booking.checking": "Đang kiểm tra...",
+    "booking.availableFallback": "Phòng còn trống.",
+    "booking.unavailableFallback": "Phòng không còn trống.",
+    "booking.emptyResponse": "Đã kiểm tra phòng, nhưng backend chưa trả về chi tiết.",
+    "booking.estimatedTotal": " Tổng dự kiến: {{total}}.",
+    "booking.checkFailed": "Không kiểm tra được tình trạng phòng.",
+    "booking.connectError": "Không kết nối được backend. Hãy chạy backend rồi thử lại.",
+    "intro.eyebrow": "Khách sạn tốt nhất Panama",
+    "intro.title": "Phòng ngập nắng chiều, gió vịnh và nhịp sống chậm rãi.",
+    "intro.copyOne": "Tạo kỷ niệm tại Lux Hotel, đảo Amelia, nơi nét duyên phương Nam, cảnh biển yên tĩnh và không gian thanh lịch tạo nên kỳ nghỉ dịu lại.",
+    "intro.copyTwo": "Phòng mới được làm lại, ẩm thực organic, liệu trình spa và concierge riêng giúp resort chỉn chu mà vẫn nhẹ nhàng.",
+    "intro.imageAlt": "Phòng lounge Lux Hotel và khung cảnh đảo",
+    "rooms.eyebrow": "Lưu trú",
+    "rooms.title": "Suite và villa rộng rãi để bạn thật sự thư giãn.",
+    "rooms.defaultTitle": "Phòng Lux Hotel",
+    "rooms.defaultCopy": "Một căn phòng tinh tế cho kỳ nghỉ ven biển yên tĩnh hơn.",
+    "rooms.defaultView": "Hướng vườn",
+    "rooms.priceFrom": "Từ {{price}} / đêm",
+    "rooms.viewDetails": "Xem chi tiết",
+    "rooms.viewDetailsAria": "Xem chi tiết {{room}}",
+    "experience.eyebrow": "Ẩm thực & Spa",
+    "experience.book": "Đặt ngay",
+    "amenities.eyebrow": "Nghỉ dưỡng nhẹ nhàng",
+    "amenities.title": "Mọi chi tiết đã sẵn sàng trước khi bạn cần.",
+    "gallery.eyebrow": "Bộ sưu tập",
+    "gallery.title": "Những khoảnh khắc nhỏ của một kỳ nghỉ yên bình.",
+    "gallery.openAria": "Mở {{title}}",
+    "reviews.eyebrow": "Cảm nhận khách",
+    "reviews.title": "Dịch vụ nhẹ nhàng. Kỷ niệm rõ nét.",
+    "journal.eyebrow": "Nhật ký",
+    "journal.title": "Câu chuyện từ hòn đảo.",
+    "journal.defaultTitle": "Nhật ký Lux Hotel",
+    "journal.defaultTag": "Nhật ký",
+    "journal.defaultCopy": "Câu chuyện từ hòn đảo.",
+    "account.eyebrow": "Tài khoản khách",
+    "account.title": "Quản lý kỳ nghỉ Lux Hotel.",
+    "account.summarySignedOut": "Đăng nhập để chuẩn bị hồ sơ đặt phòng trước ngày đến.",
+    "account.summarySignedIn": "Chào mừng trở lại, {{name}}.",
+    "account.formsAria": "Biểu mẫu tài khoản khách",
+    "account.login": "Đăng nhập",
+    "account.register": "Đăng ký",
+    "account.email": "Email",
+    "account.password": "Mật khẩu",
+    "account.fullName": "Họ tên",
+    "account.confirmPassword": "Xác nhận mật khẩu",
+    "account.phone": "Số điện thoại",
+    "account.createAccount": "Tạo tài khoản",
+    "account.signedInAs": "Đang đăng nhập là",
+    "account.guest": "Khách",
+    "account.ready": "Tài khoản khách đã sẵn sàng",
+    "account.logout": "Đăng xuất",
+    "account.loggingIn": "Đang đăng nhập...",
+    "account.creating": "Đang tạo...",
+    "account.required": "Vui lòng nhập đủ thông tin tài khoản bắt buộc.",
+    "account.passwordMismatch": "Xác nhận mật khẩu phải trùng với mật khẩu.",
+    "account.loginFailed": "Đăng nhập thất bại.",
+    "account.registerFailed": "Đăng ký thất bại.",
+    "account.missingToken": "Phản hồi tài khoản không có access token.",
+    "account.loggedInAs": "Đã đăng nhập với tên {{name}}.",
+    "account.createdFor": "Đã tạo tài khoản cho {{name}}.",
+    "account.connectError": "Không kết nối được API đăng nhập của backend.",
+    "account.loggedOut": "Đã đăng xuất.",
+    "footer.location": "Đảo Amelia, Panama",
+    "footer.note": "Nét duyên phương Nam, khung cảnh yên tĩnh và không gian thanh lịch gần vịnh.",
+    "footer.contact": "Liên hệ",
+    "footer.navigation": "Điều hướng cuối trang",
+    "footer.quickLinks": "Liên kết nhanh",
+    "footer.home": "Trang chủ",
+    "footer.terms": "Điều khoản",
+    "footer.faq": "FAQ",
+    "footer.newsletter": "Đừng bỏ lỡ cập nhật",
+    "footer.emailPlaceholder": "Địa chỉ email",
+    "footer.signUp": "Đăng ký nhận tin",
+    "footer.bottom": "© Được xây dựng bằng sự chăm chút bởi ThemeBubble. Mọi quyền được bảo lưu.",
+    "footer.goTop": "Lên đầu trang",
+    "modal.closeRoom": "Đóng chi tiết phòng",
+    "modal.reserve": "Đặt kỳ nghỉ này",
+    "modal.closeGallery": "Đóng ảnh bộ sưu tập",
+    "errors.arrivalRequired": "Chọn ngày đến.",
+    "errors.departureRequired": "Chọn ngày đi.",
+    "errors.arrivalPast": "Ngày đến không được ở quá khứ.",
+    "errors.departureAfterArrival": "Ngày đi phải sau ngày đến.",
+    "errors.adultRequired": "Cần ít nhất một người lớn.",
+    "errors.adultsMax": "Người lớn phải từ {{max}} trở xuống.",
+    "errors.childrenNegative": "Số trẻ em không được âm.",
+    "errors.childrenMax": "Số trẻ em phải từ {{max}} trở xuống.",
+    "errors.emailRequired": "Nhập email của bạn.",
+  },
 };
 
 async function apiFetch(path, options = {}) {
@@ -86,6 +350,25 @@ async function apiFetchFirst(paths, options = {}) {
   throw lastError || new Error("Cannot connect to API.");
 }
 
+function t(key, values = {}) {
+  const fallback = translations.en[key] || key;
+  const message = translations[currentLanguage]?.[key] || fallback;
+  return Object.entries(values).reduce(
+    (text, [name, value]) => text.replaceAll(`{{${name}}}`, String(value)),
+    message
+  );
+}
+
+function localized(item, key) {
+  if (currentLanguage === "vi" && item?.[`${key}Vi`]) return item[`${key}Vi`];
+  return item?.[key] || "";
+}
+
+function setText(selector, value) {
+  const element = $(selector);
+  if (element) element.textContent = value;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -116,6 +399,12 @@ function plural(value, singular, pluralName = `${singular}s`) {
 }
 
 function formatGuests(adults, children) {
+  if (currentLanguage === "vi") {
+    const parts = [`${adults} người lớn`];
+    if (children > 0) parts.push(`${children} trẻ em`);
+    return parts.join(", ");
+  }
+
   const parts = [plural(adults, "adult")];
   if (children > 0) parts.push(plural(children, "child", "children"));
   return parts.join(", ");
@@ -205,7 +494,7 @@ function clearStoredAuth() {
 }
 
 function getDisplayName(user = {}) {
-  return user.fullName || user.email || "Guest";
+  return user.fullName || user.email || t("account.guest");
 }
 
 async function refreshAuthProfile(auth) {
@@ -271,16 +560,19 @@ function formatBookingResponse(data) {
   if (!data) {
     return {
       type: "warning",
-      message: "Availability checked, but the backend did not return details.",
+      message: t("booking.emptyResponse"),
     };
   }
 
   const isAvailable = readBoolean(data?.isAvailable ?? data?.IsAvailable ?? data?.available ?? data?.Available);
   const success = readBoolean(data?.success ?? data?.Success ?? data?.succeeded ?? data?.Succeeded);
   const isNegative = isAvailable === false || success === false;
-  const message = data?.message || data?.Message || (isNegative ? "Room is not available." : "Room is available.");
+  const message = data?.message || data?.Message || (isNegative ? t("booking.unavailableFallback") : t("booking.availableFallback"));
   const estimatedTotal = data?.estimatedTotalPrice ?? data?.EstimatedTotalPrice ?? data?.totalPrice ?? data?.TotalPrice;
-  const total = estimatedTotal !== null && estimatedTotal !== undefined && estimatedTotal !== "" ? ` Estimated total: ${formatMoney(estimatedTotal)}.` : "";
+  const total =
+    estimatedTotal !== null && estimatedTotal !== undefined && estimatedTotal !== ""
+      ? t("booking.estimatedTotal", { total: formatMoney(estimatedTotal) })
+      : "";
 
   return {
     type: isNegative ? "warning" : "success",
@@ -292,120 +584,204 @@ const fallbackRooms = [
   {
     id: 1,
     title: "Standard Room",
+    titleVi: "Phòng Tiêu Chuẩn",
     image: "./Images/Room - Standard.jpg",
     price: "From $60 / night",
+    priceVi: "Từ $60 / đêm",
     copy: "Warm textures, soft linens, and a private corner for slower mornings.",
+    copyVi: "Chất liệu ấm, khăn giường mềm và góc riêng tư cho những buổi sáng chậm rãi.",
     size: "34 m2",
     view: "Garden view",
+    viewVi: "Hướng vườn",
     guests: "2 adults",
     capacityAdults: 2,
     capacityChildren: 0,
     amenities: ["King bed", "Rain shower", "Reading lounge", "Evening turndown"],
+    amenitiesVi: ["Giường king", "Sen tắm mưa", "Góc đọc sách", "Dọn phòng buổi tối"],
   },
   {
     id: 2,
     title: "Beach Villa",
+    titleVi: "Biệt Thự Biển",
     image: "./Images/Room - Beach Villa.jpg",
     price: "From $90 / night",
+    priceVi: "Từ $90 / đêm",
     copy: "Steps from the shore with open-air lounging and quiet ocean light.",
+    copyVi: "Cách bờ biển vài bước chân, có không gian thư giãn mở và ánh biển dịu nhẹ.",
     size: "52 m2",
     view: "Ocean edge",
+    viewVi: "Sát biển",
     guests: "2 adults, 1 child",
     capacityAdults: 2,
     capacityChildren: 1,
     amenities: ["Private deck", "Outdoor shower", "Beach breakfast", "Concierge pickup"],
+    amenitiesVi: ["Hiên riêng", "Tắm ngoài trời", "Bữa sáng bên biển", "Đón riêng bởi concierge"],
   },
   {
     id: 3,
     title: "Exclusive Suite",
+    titleVi: "Suite Độc Quyền",
     image: "./Images/Room - Exclusive Suite.jpg",
     price: "From $120 / night",
+    priceVi: "Từ $120 / đêm",
     copy: "A refined suite for longer stays, private dining, and terrace evenings.",
+    copyVi: "Suite tinh tế cho kỳ nghỉ dài, bữa tối riêng và những buổi tối ngoài hiên.",
     size: "68 m2",
     view: "Bay terrace",
+    viewVi: "Hiên nhìn vịnh",
     guests: "3 adults, 1 child",
     capacityAdults: 3,
     capacityChildren: 1,
     amenities: ["Separate lounge", "Terrace dining", "Soaking tub", "Priority spa booking"],
+    amenitiesVi: ["Phòng khách riêng", "Bữa tối ngoài hiên", "Bồn tắm ngâm", "Ưu tiên đặt spa"],
   },
   {
     id: 4,
     title: "Luxury Suite",
+    titleVi: "Suite Cao Cấp",
     image: "./Images/Room - Luxury Suite.jpg",
     price: "From $160 / night",
+    priceVi: "Từ $160 / đêm",
     copy: "The signature stay: generous space, bay views, and personal service.",
+    copyVi: "Lựa chọn đặc trưng với không gian rộng, hướng vịnh và dịch vụ cá nhân.",
     size: "86 m2",
     view: "Panoramic bay",
+    viewVi: "Toàn cảnh vịnh",
     guests: "4 adults, 2 children",
     capacityAdults: 4,
     capacityChildren: 2,
     amenities: ["Private host", "Sunset balcony", "Chef breakfast", "Late checkout"],
+    amenitiesVi: ["Quản gia riêng", "Ban công hoàng hôn", "Bữa sáng đầu bếp", "Trả phòng muộn"],
   },
 ];
 
 let rooms = [...fallbackRooms];
 let selectedRoomId = rooms[0]?.id || 1;
 
+function findKnownRoom(room, title) {
+  const id = Number(room.id || 0);
+  return fallbackRooms.find((item) => item.id === id || item.title.toLowerCase() === String(title).toLowerCase());
+}
+
 function normalizeRoom(room) {
   const image = room.images?.[0]?.url || room.imageUrl || room.image;
-  const title = room.title || room.name || room.roomType || "Lux Hotel Room";
+  const title = room.title || room.name || room.roomType || t("rooms.defaultTitle");
   const nightlyPrice = room.nightlyPrice ?? room.pricePerNight ?? room.price;
   const capacityAdults = Number(room.capacityAdults ?? room.capacity ?? 2);
   const capacityChildren = Number(room.capacityChildren ?? 0);
+  const priceValue = Number(nightlyPrice);
+  const knownRoom = findKnownRoom(room, title);
+  const amenities = Array.isArray(room.amenities) && room.amenities.length
+    ? room.amenities
+    : ["King bed", "Rain shower", "Concierge care"];
 
   return {
     id: Number(room.id || 0),
     title,
+    titleVi: knownRoom?.titleVi,
     image: localImagePath(image),
     price:
-      typeof nightlyPrice === "number"
-        ? `From ${formatMoney(nightlyPrice)} / night`
-        : nightlyPrice || "From $60 / night",
-    copy: room.description || room.copy || "A refined room for a quieter coastal stay.",
+      Number.isFinite(priceValue) && nightlyPrice !== ""
+        ? t("rooms.priceFrom", { price: formatMoney(priceValue) })
+        : nightlyPrice || t("rooms.priceFrom", { price: "$60" }),
+    priceValue: Number.isFinite(priceValue) ? priceValue : null,
+    copy: room.description || room.copy || t("rooms.defaultCopy"),
+    copyVi: knownRoom?.copyVi,
     size: room.sizeSquareMeters ? `${room.sizeSquareMeters} m2` : room.size || "34 m2",
-    view: room.viewName || room.view || "Garden view",
+    view: room.viewName || room.view || t("rooms.defaultView"),
+    viewVi: knownRoom?.viewVi,
     guests: formatGuests(capacityAdults, capacityChildren),
     capacityAdults,
     capacityChildren,
-    amenities: Array.isArray(room.amenities) && room.amenities.length
-      ? room.amenities
-      : ["King bed", "Rain shower", "Concierge care"],
+    amenities,
+    amenitiesVi: knownRoom?.amenitiesVi,
   };
+}
+
+function roomTitle(room) {
+  return localized(room, "title") || t("rooms.defaultTitle");
+}
+
+function roomPrice(room) {
+  if (currentLanguage === "vi" && room.priceVi) return room.priceVi;
+  if (room.priceValue !== null && room.priceValue !== undefined) {
+    return t("rooms.priceFrom", { price: formatMoney(room.priceValue) });
+  }
+  return localized(room, "price") || t("rooms.priceFrom", { price: "$60" });
+}
+
+function roomCopy(room) {
+  return localized(room, "copy") || t("rooms.defaultCopy");
+}
+
+function roomView(room) {
+  return localized(room, "view") || t("rooms.defaultView");
+}
+
+function roomGuests(room) {
+  if (Number.isFinite(room.capacityAdults) && Number.isFinite(room.capacityChildren)) {
+    return formatGuests(room.capacityAdults, room.capacityChildren);
+  }
+  return localized(room, "guests") || room.guests || formatGuests(2, 0);
+}
+
+function roomAmenities(room) {
+  if (currentLanguage === "vi" && Array.isArray(room.amenitiesVi) && room.amenitiesVi.length) {
+    return room.amenitiesVi;
+  }
+  return Array.isArray(room.amenities) ? room.amenities : [];
 }
 
 const experiences = [
   {
     image: "./Images/Culinary Experience.jpg",
     title: "Culinary Experience",
+    titleVi: "Trải Nghiệm Ẩm Thực",
     copy: "Organic garden ingredients, quiet table service, and menus built around the island.",
+    copyVi: "Nguyên liệu organic từ vườn, phục vụ nhẹ nhàng và thực đơn lấy cảm hứng từ hòn đảo.",
+    alt: "Dining at Lux Hotel",
+    altVi: "Ẩm thực tại Lux Hotel",
   },
   {
     image: "./Images/Spa like no other.jpg",
     title: "Spa Like No Other",
+    titleVi: "Spa Thư Giãn Khác Biệt",
     copy: "A calm ritual of native botanicals, warm stones, and coastal stillness.",
+    copyVi: "Một nghi thức thư giãn với thảo mộc bản địa, đá ấm và sự tĩnh lặng ven biển.",
+    alt: "Spa at Lux Hotel",
+    altVi: "Spa tại Lux Hotel",
   },
 ];
+let experienceIndex = 0;
 
 const amenities = [
   {
     title: "Airport Pickup",
+    titleVi: "Đón Sân Bay",
     image: "./Images/plane 2.jpg",
     copy: "Arrive with a private transfer already waiting.",
+    copyVi: "Đến nơi với xe đưa đón riêng đã sẵn sàng chờ bạn.",
   },
   {
     title: "Breakfast",
+    titleVi: "Bữa Sáng",
     image: "./Images/breakfast 2.jpg",
     copy: "Seasonal breakfast served slowly, indoors or by the terrace.",
+    copyVi: "Bữa sáng theo mùa được phục vụ thong thả trong nhà hoặc bên hiên.",
   },
   {
     title: "City Guide",
+    titleVi: "Hướng Dẫn Thành Phố",
     image: "./Images/tour-guide 2.jpg",
     copy: "Local routes, hidden restaurants, and curated island hours.",
+    copyVi: "Lộ trình địa phương, nhà hàng ẩn mình và lịch trình đảo được chọn lọc.",
   },
   {
     title: "Beach BBQ",
+    titleVi: "BBQ Bên Biển",
     image: "./Images/bbq 2.jpg",
     copy: "A low-lit beach dinner arranged by the culinary team.",
+    copyVi: "Bữa tối bên biển trong ánh đèn dịu do đội ẩm thực chuẩn bị.",
   },
 ];
 
@@ -414,37 +790,49 @@ const reviews = [
     name: "Mike Fleetwood",
     image: "./Images/mike-fleetwood.jpg",
     copy: "Perfect location, quiet rooms, and a staff that somehow knew what we needed before we asked.",
+    copyVi: "Vị trí hoàn hảo, phòng yên tĩnh và đội ngũ dường như biết chúng tôi cần gì trước khi hỏi.",
   },
   {
     name: "Joanna Roberts",
     image: "./Images/joanna-roberts.jpg",
     copy: "The arrival felt personal, the room was beautiful, and every detail was handled with real care.",
+    copyVi: "Khoảnh khắc đến nơi rất riêng tư, phòng đẹp và mọi chi tiết đều được chăm chút thật sự.",
   },
   {
     name: "Alex Johnson",
     image: "./Images/alex-johnson.jpg",
     copy: "A polished hotel without the noise. We came for two nights and immediately wanted another week.",
+    copyVi: "Một khách sạn chỉn chu nhưng không ồn ào. Chúng tôi ở hai đêm và lập tức muốn thêm một tuần.",
   },
 ];
 
 const fallbackJournal = [
   {
     title: "Staying in Style Forever",
+    titleVi: "Nghỉ Dưỡng Thanh Lịch",
     image: "./Images/va0ymkiftpa-368x268.jpg",
     tag: "Lifestyle",
+    tagVi: "Phong cách sống",
     copy: "A guide to slower mornings and resort rituals.",
+    copyVi: "Gợi ý cho những buổi sáng chậm rãi và các nghi thức nghỉ dưỡng.",
   },
   {
     title: "Electric Feel And Other Things",
+    titleVi: "Cảm Hứng Từ Đảo",
     image: "./Images/iStock_000002993908_Medium-1-1-368x268.jpg",
     tag: "Island",
+    tagVi: "Hòn đảo",
     copy: "How Panama evenings shape the resort mood.",
+    copyVi: "Cách những buổi tối Panama tạo nên nhịp điệu của resort.",
   },
   {
     title: "Why Hotel Comfort Matters",
+    titleVi: "Vì Sao Sự Thoải Mái Quan Trọng",
     image: "./Images/ihwo0unctps-368x268.jpg",
     tag: "Design",
+    tagVi: "Thiết kế",
     copy: "The small choices behind a calmer stay.",
+    copyVi: "Những lựa chọn nhỏ phía sau một kỳ nghỉ bình yên hơn.",
   },
 ];
 
@@ -452,37 +840,47 @@ let journal = [...fallbackJournal];
 
 function normalizeArticle(article) {
   return {
-    title: article.title || "Lux Hotel Journal",
+    title: article.title || t("journal.defaultTitle"),
     image: localImagePath(article.coverImageUrl, "./Images/va0ymkiftpa-368x268.jpg"),
-    tag: article.slug ? article.slug.replaceAll("-", " ") : "Journal",
-    copy: article.summary || article.content || "Stories from the island.",
+    tag: article.slug ? article.slug.replaceAll("-", " ") : t("journal.defaultTag"),
+    copy: article.summary || article.content || t("journal.defaultCopy"),
   };
 }
 
 const gallery = [
   {
     title: "Golden hour lounge",
+    titleVi: "Lounge trong nắng chiều",
     kicker: "Arrival",
+    kickerVi: "Đón khách",
     image: "./Images/Panama's Finist Hotel.jpg",
   },
   {
     title: "Barefoot beach light",
+    titleVi: "Ánh biển chân trần",
     kicker: "Coast",
+    kickerVi: "Bờ biển",
     image: "./Images/Slider 1.jpg",
   },
   {
     title: "Dinner by the island",
+    titleVi: "Bữa tối bên đảo",
     kicker: "Dining",
+    kickerVi: "Ẩm thực",
     image: "./Images/Culinary Experience.jpg",
   },
   {
     title: "Quiet spa ritual",
+    titleVi: "Nghi thức spa yên tĩnh",
     kicker: "Spa",
+    kickerVi: "Spa",
     image: "./Images/Spa like no other.jpg",
   },
   {
     title: "Villa mornings",
+    titleVi: "Buổi sáng ở villa",
     kicker: "Rooms",
+    kickerVi: "Phòng",
     image: "./Images/Room - Beach Villa.jpg",
   },
 ];
@@ -495,39 +893,41 @@ function renderRoomOptions() {
   if (!hasSelected) selectedRoomId = rooms[0]?.id || 1;
 
   select.innerHTML = rooms
-    .map(
-      (room) => `
+    .map((room) => {
+      const title = roomTitle(room);
+      return `
         <option value="${room.id}" ${room.id === selectedRoomId ? "selected" : ""}>
-          ${escapeHtml(room.title)}
+          ${escapeHtml(title)}
         </option>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
 function renderRooms() {
   $("#roomsGrid").innerHTML = rooms
-    .map(
-      (room, index) => `
+    .map((room, index) => {
+      const title = roomTitle(room);
+      return `
         <article class="room-card">
-          <button class="room-card-button" type="button" data-room-index="${index}" aria-label="View ${escapeHtml(room.title)} details">
+          <button class="room-card-button" type="button" data-room-index="${index}" aria-label="${escapeHtml(t("rooms.viewDetailsAria", { room: title }))}">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(room.title)}" loading="lazy" decoding="async" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" />
             </div>
             <div class="content">
-              <p class="price">${escapeHtml(room.price)}</p>
-              <h3>${escapeHtml(room.title)}</h3>
-              <p>${escapeHtml(room.copy)}</p>
+              <p class="price">${escapeHtml(roomPrice(room))}</p>
+              <h3>${escapeHtml(title)}</h3>
+              <p>${escapeHtml(roomCopy(room))}</p>
               <div class="room-meta">
-                <span>${escapeHtml(room.guests)}</span>
-                <span>${escapeHtml(room.view)}</span>
+                <span>${escapeHtml(roomGuests(room))}</span>
+                <span>${escapeHtml(roomView(room))}</span>
               </div>
-              <strong>View details</strong>
+              <strong>${escapeHtml(t("rooms.viewDetails"))}</strong>
             </div>
           </button>
         </article>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
@@ -536,8 +936,8 @@ function renderAmenities() {
     .map(
       (item) => `
         <article class="amenity-card" data-bg="${escapeHtml(item.image)}">
-          <h3>${escapeHtml(item.title)}</h3>
-          <p>${escapeHtml(item.copy)}</p>
+          <h3>${escapeHtml(localized(item, "title"))}</h3>
+          <p>${escapeHtml(localized(item, "copy"))}</p>
         </article>
       `
     )
@@ -553,10 +953,10 @@ function renderReviews() {
             <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
-              <p>Verified guest</p>
+              <p>${escapeHtml(t("common.verifiedGuest"))}</p>
             </div>
           </header>
-          <p>“${escapeHtml(review.copy)}”</p>
+          <p>“${escapeHtml(localized(review, "copy"))}”</p>
         </article>
       `
     )
@@ -568,11 +968,11 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(post.title)}" loading="lazy" decoding="async" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" />
           <div class="content">
-            <p class="tag">${escapeHtml(post.tag)}</p>
-            <h3>${escapeHtml(post.title)}</h3>
-            <p>${escapeHtml(post.copy)}</p>
+            <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
+            <h3>${escapeHtml(localized(post, "title"))}</h3>
+            <p>${escapeHtml(localized(post, "copy"))}</p>
           </div>
         </article>
       `
@@ -582,17 +982,18 @@ function renderJournal() {
 
 function renderGallery() {
   $("#galleryGrid").innerHTML = gallery
-    .map(
-      (item, index) => `
-        <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="Open ${escapeHtml(item.title)}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy" decoding="async" />
+    .map((item, index) => {
+      const title = localized(item, "title");
+      return `
+        <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="${escapeHtml(t("gallery.openAria", { title }))}">
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" />
           <span>
-            <small>${escapeHtml(item.kicker)}</small>
-            <strong>${escapeHtml(item.title)}</strong>
+            <small>${escapeHtml(localized(item, "kicker"))}</small>
+            <strong>${escapeHtml(title)}</strong>
           </span>
         </button>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
@@ -663,6 +1064,88 @@ async function fetchArticles() {
   }
 }
 
+function updateLanguageButtons() {
+  $$("[data-language-option]").forEach((button) => {
+    const isActive = button.dataset.languageOption === currentLanguage;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+function updateThemeButton() {
+  const button = $("#themeToggle");
+  if (!button) return;
+  const nextTheme = currentTheme === "night" ? "day" : "night";
+  const label = $("[data-theme-label]", button);
+  if (label) label.textContent = t(nextTheme === "night" ? "theme.night" : "theme.day");
+  button.setAttribute("aria-label", t(nextTheme === "night" ? "theme.switchToNight" : "theme.switchToDay"));
+}
+
+function applyTheme(theme = currentTheme) {
+  currentTheme = theme === "night" ? "night" : "day";
+  document.documentElement.dataset.theme = currentTheme;
+  localStorage.setItem(themeStorageKey, currentTheme);
+  updateThemeButton();
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = currentLanguage;
+
+  $$("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+
+  $$("[data-i18n-aria]").forEach((element) => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAria));
+  });
+
+  $$("[data-i18n-alt]").forEach((element) => {
+    element.setAttribute("alt", t(element.dataset.i18nAlt));
+  });
+
+  $$("[data-i18n-placeholder]").forEach((element) => {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  });
+
+  updateLanguageButtons();
+  updateThemeButton();
+  updateAccountSummary();
+}
+
+function renderLocalizedContent() {
+  renderRoomOptions();
+  renderRooms();
+  renderAmenities();
+  setupLazyBackgrounds($("#amenitiesGrid"));
+  renderReviews();
+  renderJournal();
+  renderGallery();
+  renderExperience();
+  updateAccountSummary();
+  window.ScrollTrigger?.refresh();
+}
+
+function setLanguage(language) {
+  if (!supportedLanguages.includes(language) || language === currentLanguage) return;
+  currentLanguage = language;
+  localStorage.setItem(languageStorageKey, currentLanguage);
+  applyStaticTranslations();
+  renderLocalizedContent();
+}
+
+function setupPreferences() {
+  applyTheme(currentTheme);
+  applyStaticTranslations();
+
+  $$("[data-language-option]").forEach((button) => {
+    button.addEventListener("click", () => setLanguage(button.dataset.languageOption));
+  });
+
+  $("#themeToggle")?.addEventListener("click", () => {
+    applyTheme(currentTheme === "night" ? "day" : "night");
+  });
+}
+
 function setupMenu() {
   const button = $(".menu-toggle");
   button.addEventListener("click", () => {
@@ -697,24 +1180,35 @@ function setupHeroSlider() {
   window.setInterval(() => show(index + 1), 7000);
 }
 
-function setupExperience() {
-  let index = 0;
+function renderExperience(nextIndex = experienceIndex, animate = false) {
   const image = $("#experienceImage");
   const title = $("#experienceTitle");
   const copy = $("#experienceCopy");
-  const show = (nextIndex) => {
-    index = (nextIndex + experiences.length) % experiences.length;
-    const item = experiences[index];
-    image.style.opacity = "0";
-    window.setTimeout(() => {
-      image.src = item.image;
-      title.textContent = item.title;
-      copy.textContent = item.copy;
-      image.style.opacity = "1";
-    }, 180);
+  if (!image || !title || !copy || !experiences.length) return;
+
+  experienceIndex = (nextIndex + experiences.length) % experiences.length;
+  const item = experiences[experienceIndex];
+  const update = () => {
+    image.src = item.image;
+    image.alt = localized(item, "alt");
+    title.textContent = localized(item, "title");
+    copy.textContent = localized(item, "copy");
+    image.style.opacity = "1";
   };
-  $("[data-exp-next]").addEventListener("click", () => show(index + 1));
-  $("[data-exp-prev]").addEventListener("click", () => show(index - 1));
+
+  if (!animate) {
+    update();
+    return;
+  }
+
+  image.style.opacity = "0";
+  window.setTimeout(update, 180);
+}
+
+function setupExperience() {
+  renderExperience();
+  $("[data-exp-next]").addEventListener("click", () => renderExperience(experienceIndex + 1, true));
+  $("[data-exp-prev]").addEventListener("click", () => renderExperience(experienceIndex - 1, true));
 }
 
 function showError(id, visible, message) {
@@ -779,10 +1273,10 @@ function updateAccountSummary(auth = getStoredAuth()) {
   const user = auth?.user;
   if (auth?.token) {
     const name = getDisplayName(user);
-    summary.textContent = `Welcome back, ${name}.`;
+    summary.textContent = t("account.summarySignedIn", { name });
     if (profile) profile.hidden = false;
     if (profileName) profileName.textContent = name;
-    if (profileEmail) profileEmail.textContent = user?.email || "Guest account ready";
+    if (profileEmail) profileEmail.textContent = user?.email || t("account.ready");
     if (tabs) tabs.hidden = true;
     panels.forEach((panel) => {
       panel.hidden = true;
@@ -791,9 +1285,9 @@ function updateAccountSummary(auth = getStoredAuth()) {
     return;
   }
 
-  summary.textContent = "Sign in to keep your booking profile ready before arrival.";
+  summary.textContent = t("account.summarySignedOut");
   if (profile) profile.hidden = true;
-  if (profileName) profileName.textContent = "Guest";
+  if (profileName) profileName.textContent = t("account.guest");
   if (profileEmail) profileEmail.textContent = "";
   if (tabs) tabs.hidden = false;
   const activePanel = $("[data-auth-panel].is-active") || $("#loginForm");
@@ -806,11 +1300,13 @@ function updateAccountSummary(auth = getStoredAuth()) {
 function validateBookingDates(arrival, departure) {
   const missingArrival = !arrival;
   const missingDeparture = !departure;
-  updateFieldError("#arrivalDateError", missingArrival, "Choose an arrival date.");
-  updateFieldError("#departureDateError", missingDeparture, "Choose a departure date.");
+  const arrivalRequired = t("errors.arrivalRequired");
+  const departureRequired = t("errors.departureRequired");
+  updateFieldError("#arrivalDateError", missingArrival, arrivalRequired);
+  updateFieldError("#departureDateError", missingDeparture, departureRequired);
 
   if (missingArrival || missingDeparture) {
-    showToast("error", missingArrival ? "Choose an arrival date." : "Choose a departure date.");
+    showToast("error", missingArrival ? arrivalRequired : departureRequired);
     return false;
   }
 
@@ -820,14 +1316,16 @@ function validateBookingDates(arrival, departure) {
   today.setHours(0, 0, 0, 0);
 
   if (arrivalDate < today) {
-    updateFieldError("#arrivalDateError", true, "Arrival date cannot be in the past.");
-    showToast("error", "Arrival date cannot be in the past.");
+    const message = t("errors.arrivalPast");
+    updateFieldError("#arrivalDateError", true, message);
+    showToast("error", message);
     return false;
   }
 
   if (departureDate <= arrivalDate) {
-    updateFieldError("#departureDateError", true, "Departure must be after arrival.");
-    showToast("error", "Departure must be after arrival.");
+    const message = t("errors.departureAfterArrival");
+    updateFieldError("#departureDateError", true, message);
+    showToast("error", message);
     return false;
   }
 
@@ -843,22 +1341,22 @@ function readGuestCount(selector) {
 
 function validateGuestCounts(adults, children) {
   if (!Number.isInteger(adults) || adults < 1) {
-    showToast("error", "At least one adult is required.");
+    showToast("error", t("errors.adultRequired"));
     return false;
   }
 
   if (adults > maxGuestCount) {
-    showToast("error", `Adults must be ${maxGuestCount} or fewer.`);
+    showToast("error", t("errors.adultsMax", { max: maxGuestCount }));
     return false;
   }
 
   if (!Number.isInteger(children) || children < 0) {
-    showToast("error", "Children cannot be negative.");
+    showToast("error", t("errors.childrenNegative"));
     return false;
   }
 
   if (children > maxGuestCount) {
-    showToast("error", `Children must be ${maxGuestCount} or fewer.`);
+    showToast("error", t("errors.childrenMax", { max: maxGuestCount }));
     return false;
   }
 
@@ -932,17 +1430,17 @@ async function submitAuthForm(form, mode) {
   const phoneNumber = String(formData.get("phoneNumber") || "").trim();
 
   if (!email || !email.includes("@") || !password || (mode === "register" && !fullName)) {
-    setAuthStatus("error", "Fill in the required account fields.");
+    setAuthStatus("error", t("account.required"));
     return;
   }
 
   if (mode === "register" && password !== confirmPassword) {
-    setAuthStatus("error", "Confirm password must match password.");
+    setAuthStatus("error", t("account.passwordMismatch"));
     return;
   }
 
   submitButton.disabled = true;
-  submitButton.textContent = mode === "login" ? "Logging in..." : "Creating...";
+  submitButton.textContent = mode === "login" ? t("account.loggingIn") : t("account.creating");
 
   try {
     const payload =
@@ -959,13 +1457,13 @@ async function submitAuthForm(form, mode) {
     const data = await readJson(response);
 
     if (!response.ok) {
-      setAuthStatus("error", formatApiError(data, mode === "login" ? "Login failed." : "Registration failed."));
+      setAuthStatus("error", formatApiError(data, mode === "login" ? t("account.loginFailed") : t("account.registerFailed")));
       return;
     }
 
     const auth = storeAuth(data);
     if (!auth) {
-      setAuthStatus("warning", "Account response did not include an access token.");
+      setAuthStatus("warning", t("account.missingToken"));
       return;
     }
 
@@ -973,13 +1471,13 @@ async function submitAuthForm(form, mode) {
     const name = getDisplayName(enrichedAuth.user);
     updateAccountSummary(enrichedAuth);
     form.reset();
-    setAuthStatus("success", mode === "login" ? `Logged in as ${name}.` : `Account created for ${name}.`);
+    setAuthStatus("success", mode === "login" ? t("account.loggedInAs", { name }) : t("account.createdFor", { name }));
   } catch (error) {
     console.error("Auth API error:", error);
-    setAuthStatus("error", "Cannot connect to the backend auth API.");
+    setAuthStatus("error", t("account.connectError"));
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = mode === "login" ? "Login" : "Create account";
+    submitButton.textContent = mode === "login" ? t("account.login") : t("account.createAccount");
   }
 }
 
@@ -1007,7 +1505,7 @@ function setupAuthForms() {
     clearStoredAuth();
     switchAuthPanel("login");
     updateAccountSummary(null);
-    setAuthStatus("success", "Logged out.");
+    setAuthStatus("success", t("account.loggedOut"));
   });
 }
 
@@ -1039,7 +1537,7 @@ function setupForms() {
     if (!validateGuestCounts(adultCount, childCount)) return;
 
     submitButton.disabled = true;
-    submitButton.textContent = "Checking...";
+    submitButton.textContent = t("booking.checking");
 
     try {
       const response = await apiFetch("/bookings/check-availability", {
@@ -1062,7 +1560,7 @@ function setupForms() {
 
       const data = await readJson(response);
       if (!response.ok) {
-        setBookingStatus("error", formatApiError(data, "Could not check availability."));
+        setBookingStatus("error", formatApiError(data, t("booking.checkFailed")));
         return;
       }
 
@@ -1070,17 +1568,17 @@ function setupForms() {
       setBookingStatus(result.type, result.message);
     } catch (error) {
       console.error("Booking API error:", error);
-      setBookingStatus("error", "Cannot connect to the backend API. Start the backend and try again.");
+      setBookingStatus("error", t("booking.connectError"));
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = "Search rooms";
+      submitButton.textContent = t("booking.search");
     }
   });
 
   $("#sign-in-form").addEventListener("submit", (event) => {
     const email = $("#email").value.trim();
     const invalid = !email || !email.includes("@");
-    showError("#emailError", invalid, "Enter your email.");
+    showError("#emailError", invalid, t("errors.emailRequired"));
     if (invalid) event.preventDefault();
   });
 }
@@ -1107,13 +1605,14 @@ function setupRoomModal() {
   const open = (room) => {
     selectedRoomId = room.id || selectedRoomId;
     renderRoomOptions();
+    const titleText = roomTitle(room);
     image.src = room.image;
-    image.alt = room.title;
-    title.textContent = room.title;
-    price.textContent = room.price;
-    description.textContent = room.copy;
-    stats.innerHTML = [room.size, room.view, room.guests].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
-    amenitiesList.innerHTML = room.amenities.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    image.alt = titleText;
+    title.textContent = titleText;
+    price.textContent = roomPrice(room);
+    description.textContent = roomCopy(room);
+    stats.innerHTML = [room.size, roomView(room), roomGuests(room)].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
+    amenitiesList.innerHTML = roomAmenities(room).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
     modal.classList.add("is-open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -1144,17 +1643,20 @@ function setupGalleryLightbox() {
   };
 
   const open = (item) => {
+    const titleText = localized(item, "title");
     image.src = item.image;
-    image.alt = item.title;
-    title.textContent = item.title;
-    kicker.textContent = item.kicker;
+    image.alt = titleText;
+    title.textContent = titleText;
+    kicker.textContent = localized(item, "kicker");
     lightbox.classList.add("is-open");
     lightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
   };
 
-  $$(".gallery-item").forEach((button) => {
-    button.addEventListener("click", () => open(gallery[Number(button.dataset.galleryIndex)]));
+  $("#galleryGrid").addEventListener("click", (event) => {
+    const button = event.target.closest(".gallery-item");
+    if (!button) return;
+    open(gallery[Number(button.dataset.galleryIndex)]);
   });
 
   $$("[data-close-gallery]").forEach((button) => button.addEventListener("click", close));
@@ -1170,7 +1672,7 @@ function setupMagneticButtons() {
   if (!gsap || reducedMotion || coarsePointer) return;
 
   const buttons = $$(
-    ".primary-btn, .ghost-btn, .nav-cta, .booking-form button, .newsletter-row button, .auth-tabs button, .auth-form button, .auth-logout, .experience-actions button, .hero-controls button"
+    ".primary-btn, .ghost-btn, .nav-cta, .language-switch button, .theme-toggle, .booking-form button, .newsletter-row button, .auth-tabs button, .auth-form button, .auth-logout, .experience-actions button, .hero-controls button"
   );
 
   buttons.forEach((button) => {
@@ -1260,6 +1762,7 @@ function setupAnimations() {
   });
 }
 
+setupPreferences();
 renderRooms();
 renderRoomOptions();
 renderAmenities();

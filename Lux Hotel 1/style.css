@@ -8,9 +8,62 @@
     --gold: #b99867;
     --gold-dark: #8d6f42;
     --sand: #e7d9c2;
+    --section-alt: #f5eee4;
+    --input-bg: #fff;
+    --input-placeholder: rgba(23, 19, 15, 0.45);
+    --booking-bg: rgba(255, 253, 248, 0.95);
+    --control-bg: rgba(255, 255, 255, 0.08);
+    --control-border: rgba(255, 255, 255, 0.26);
+    --modal-close-bg: rgba(255, 255, 255, 0.82);
+    --success-bg: rgba(17, 122, 72, 0.08);
+    --success-line: rgba(17, 122, 72, 0.24);
+    --success-text: #0f6f43;
+    --warning-bg: rgba(185, 152, 103, 0.12);
+    --warning-line: rgba(185, 152, 103, 0.34);
+    --warning-text: #79572a;
+    --error-bg: rgba(180, 35, 24, 0.08);
+    --error-line: rgba(180, 35, 24, 0.24);
+    --error-text: #b42318;
+    --toast-bg: rgba(255, 253, 248, 0.98);
+    --toast-error-bg: #fff8f7;
+    --toast-success-bg: #f4fbf7;
+    --toast-warning-bg: #fffaf0;
     --font-body: "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-display: "Noto Serif", Georgia, "Times New Roman", serif;
     --container: 1180px;
+}
+
+:root[data-theme="night"] {
+    color-scheme: dark;
+    --ink: #f7efe4;
+    --muted: #c7b9a8;
+    --line: rgba(255, 246, 234, 0.14);
+    --paper: #12100d;
+    --card: #1d1813;
+    --deep: #090806;
+    --gold: #c7a46d;
+    --gold-dark: #d4b57f;
+    --sand: #3a3026;
+    --section-alt: #17130f;
+    --input-bg: #14110e;
+    --input-placeholder: rgba(247, 239, 228, 0.46);
+    --booking-bg: rgba(29, 24, 19, 0.95);
+    --control-bg: rgba(255, 255, 255, 0.1);
+    --control-border: rgba(255, 255, 255, 0.2);
+    --modal-close-bg: rgba(29, 24, 19, 0.88);
+    --success-bg: rgba(48, 185, 118, 0.13);
+    --success-line: rgba(48, 185, 118, 0.34);
+    --success-text: #8ee3b1;
+    --warning-bg: rgba(212, 181, 127, 0.13);
+    --warning-line: rgba(212, 181, 127, 0.32);
+    --warning-text: #f0d3a1;
+    --error-bg: rgba(244, 95, 83, 0.13);
+    --error-line: rgba(244, 95, 83, 0.32);
+    --error-text: #ffaaa1;
+    --toast-bg: rgba(29, 24, 19, 0.98);
+    --toast-error-bg: #271310;
+    --toast-success-bg: #102218;
+    --toast-warning-bg: #241d12;
 }
 
 * {
@@ -30,6 +83,7 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
+    transition: background 0.24s ease, color 0.24s ease;
 }
 
 body.menu-open {
@@ -137,6 +191,58 @@ select {
     border: 1px solid rgba(255, 255, 255, 0.38);
     border-radius: 999px;
     padding: 0 18px;
+}
+
+.nav-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.language-switch {
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(36px, 1fr));
+    gap: 2px;
+    border: 1px solid var(--control-border);
+    border-radius: 999px;
+    padding: 3px;
+    background: var(--control-bg);
+}
+
+.language-switch button,
+.theme-toggle {
+    min-height: 32px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 11px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.language-switch button.is-active,
+.language-switch button[aria-pressed="true"] {
+    background: #fff;
+    color: var(--deep);
+}
+
+.theme-toggle {
+    border: 1px solid var(--control-border);
+    background: var(--control-bg);
+}
+
+.theme-toggle:hover,
+.language-switch button:hover {
+    color: #fff;
+}
+
+.language-switch button.is-active:hover,
+.language-switch button[aria-pressed="true"]:hover {
+    color: var(--deep);
 }
 
 .menu-toggle {
@@ -399,10 +505,10 @@ h1 {
     grid-template-columns: minmax(190px, 1.25fr) repeat(4, minmax(150px, 1fr)) minmax(160px, auto);
     gap: 16px;
     align-items: end;
-    border: 1px solid rgba(23, 19, 15, 0.1);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 20px;
-    background: rgba(255, 253, 248, 0.95);
+    background: var(--booking-bg);
     box-shadow: rgba(23, 19, 15, 0.14) 0 24px 70px;
     backdrop-filter: blur(20px);
 }
@@ -445,9 +551,13 @@ select {
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 0 14px;
-    background: #fff;
+    background: var(--input-bg);
     color: var(--ink);
     outline: none;
+}
+
+input::placeholder {
+    color: var(--input-placeholder);
 }
 
 input:focus,
@@ -490,21 +600,21 @@ select:focus {
 }
 
 .form-status.success {
-    border-color: rgba(17, 122, 72, 0.24);
-    background: rgba(17, 122, 72, 0.08);
-    color: #0f6f43;
+    border-color: var(--success-line);
+    background: var(--success-bg);
+    color: var(--success-text);
 }
 
 .form-status.warning {
-    border-color: rgba(185, 152, 103, 0.34);
-    background: rgba(185, 152, 103, 0.12);
-    color: #79572a;
+    border-color: var(--warning-line);
+    background: var(--warning-bg);
+    color: var(--warning-text);
 }
 
 .form-status.error {
-    border-color: rgba(180, 35, 24, 0.24);
-    background: rgba(180, 35, 24, 0.08);
-    color: #b42318;
+    border-color: var(--error-line);
+    background: var(--error-bg);
+    color: var(--error-text);
 }
 
 .booking-status,
@@ -540,7 +650,7 @@ select:focus {
     border: 1px solid rgba(23, 19, 15, 0.12);
     border-radius: 8px;
     padding: 14px 14px 14px 16px;
-    background: rgba(255, 253, 248, 0.98);
+    background: var(--toast-bg);
     box-shadow: rgba(23, 19, 15, 0.18) 0 18px 46px;
     color: var(--ink);
     font-size: 14px;
@@ -558,29 +668,29 @@ select:focus {
 }
 
 .site-toast.error {
-    border-color: rgba(180, 35, 24, 0.24);
-    background: #fff8f7;
-    color: #9f2318;
+    border-color: var(--error-line);
+    background: var(--toast-error-bg);
+    color: var(--error-text);
 }
 
 .site-toast.success {
-    border-color: rgba(17, 122, 72, 0.24);
-    background: #f4fbf7;
-    color: #0f6f43;
+    border-color: var(--success-line);
+    background: var(--toast-success-bg);
+    color: var(--success-text);
 }
 
 .site-toast.warning {
-    border-color: rgba(185, 152, 103, 0.34);
-    background: #fffaf0;
-    color: #79572a;
+    border-color: var(--warning-line);
+    background: var(--toast-warning-bg);
+    color: var(--warning-text);
 }
 
 .site-toast button {
     width: 30px;
     height: 30px;
-    border: 1px solid rgba(23, 19, 15, 0.12);
+    border: 1px solid var(--line);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--input-bg);
     color: currentColor;
     font-size: 14px;
     font-weight: 900;
@@ -902,7 +1012,7 @@ select:focus {
 }
 
 .gallery-section {
-    background: #f5eee4;
+    background: var(--section-alt);
 }
 
 .gallery-grid {
@@ -1002,7 +1112,7 @@ select:focus {
 }
 
 .account-section {
-    background: #f5eee4;
+    background: var(--section-alt);
 }
 
 .account-layout {
@@ -1046,7 +1156,7 @@ select:focus {
     min-height: 42px;
     border: 1px solid var(--line);
     border-radius: 999px;
-    background: #fff;
+    background: var(--input-bg);
     color: var(--muted);
     font-size: 12px;
     font-weight: 800;
@@ -1084,10 +1194,10 @@ select:focus {
 .auth-profile {
     display: grid;
     gap: 6px;
-    border: 1px solid rgba(17, 122, 72, 0.18);
+    border: 1px solid var(--success-line);
     border-radius: 8px;
     padding: 18px;
-    background: rgba(17, 122, 72, 0.06);
+    background: var(--success-bg);
 }
 
 .auth-profile span {
@@ -1331,10 +1441,10 @@ select:focus {
     right: 16px;
     z-index: 3;
     min-height: 38px;
-    border: 1px solid rgba(23, 19, 15, 0.14);
+    border: 1px solid var(--line);
     border-radius: 999px;
     padding: 0 14px;
-    background: rgba(255, 255, 255, 0.82);
+    background: var(--modal-close-bg);
     color: var(--ink);
     font-size: 12px;
     font-weight: 800;
@@ -1383,6 +1493,14 @@ select:focus {
 }
 
 @media (max-width: 1100px) {
+    .nav-links {
+        gap: 16px;
+    }
+
+    .nav-links a {
+        font-size: 12px;
+    }
+
     h1 {
         font-size: 82px;
     }
@@ -1460,6 +1578,20 @@ select:focus {
 
     .nav-links a {
         padding: 14px;
+    }
+
+    .nav-tools {
+        justify-content: space-between;
+        padding: 12px 4px 6px;
+    }
+
+    .language-switch,
+    .theme-toggle {
+        flex: 1;
+    }
+
+    .theme-toggle {
+        min-height: 40px;
     }
 
     .nav-links .nav-cta {
