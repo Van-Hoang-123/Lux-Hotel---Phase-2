@@ -11,15 +11,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Serif:wght@600;700&display=swap"
       rel="stylesheet"
     />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
-      onerror="this.remove()"
     />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=20260528-fix2" />
   </head>
   <body>
     <header class="site-header" id="top">
@@ -36,6 +35,7 @@
           <a href="#rooms">Rooms</a>
           <a href="#dining">Dining</a>
           <a href="#amenities">Amenities</a>
+          <a href="#gallery">Gallery</a>
           <a href="#journal">Journal</a>
           <a class="nav-cta" href="#booking">Reserve</a>
         </div>
@@ -47,6 +47,7 @@
         <div class="hero-slide is-active" style="--hero-image: url('./Images/Slider 1.jpg')"></div>
         <div class="hero-slide" style="--hero-image: url('./Images/Slider 2.jpg')"></div>
         <div class="hero-overlay"></div>
+        <div class="hero-film" aria-hidden="true"></div>
 
         <div class="hero-content">
           <p class="eyebrow">Amelia Island, Panama</p>
@@ -58,6 +59,12 @@
             <a class="primary-btn" href="#booking">Check availability</a>
             <a class="ghost-btn" href="#rooms">Explore rooms</a>
           </div>
+        </div>
+
+        <div class="hero-signature" aria-label="Hotel highlights">
+          <span>Ocean-facing villas</span>
+          <span>Private dining</span>
+          <span>Island concierge</span>
         </div>
 
         <div class="hero-controls" aria-label="Hero slider controls">
@@ -72,6 +79,10 @@
             <span class="eyebrow dark">Reservations</span>
             <h2 id="booking-title">Plan your stay.</h2>
           </div>
+          <label class="room-field">
+            <span>Room</span>
+            <select id="roomSelect" name="roomId" aria-label="Choose room"></select>
+          </label>
           <label>
             <span>Arrival</span>
             <input type="date" id="arrivalDate" name="arrivalDate" />
@@ -101,6 +112,7 @@
             </select>
           </label>
           <button type="submit">Search rooms</button>
+          <p class="form-status" id="bookingStatus" role="status" aria-live="polite"></p>
         </form>
       </section>
 
@@ -165,6 +177,16 @@
         </div>
       </section>
 
+      <section class="gallery-section section-pad" id="gallery">
+        <div class="container-xl">
+          <div class="section-heading">
+            <p class="eyebrow dark">Gallery</p>
+            <h2>Small scenes from a quieter stay.</h2>
+          </div>
+          <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
+      </section>
+
       <section class="reviews-section section-pad">
         <div class="container-xl">
           <div class="section-heading center">
@@ -195,29 +217,74 @@
               <em>Hotel</em>
             </a>
             <p>Amelia Island, Panama</p>
+            <p class="footer-note">Southern charm, quiet scenery, and casually elegant surroundings near the bay.</p>
           </div>
           <div>
             <strong>Contact</strong>
+            <p>221 B, Baker Street, London</p>
             <a href="tel:+011877834245">+01 1 877 834 245</a>
             <a href="mailto:stay@luxhotel.example">stay@luxhotel.example</a>
           </div>
+          <nav aria-label="Footer navigation">
+            <strong>Quick links</strong>
+            <a href="#top">Home</a>
+            <a href="#rooms">Rooms</a>
+            <a href="#booking">Terms & Conditions</a>
+            <a href="#journal">FAQ</a>
+          </nav>
           <form id="sign-in-form" novalidate>
-            <strong>Stay in touch</strong>
+            <strong>Don't miss any updates</strong>
             <div class="newsletter-row">
               <input type="email" id="email" name="email" placeholder="Email address" />
-              <button type="submit">Sign up</button>
+              <button type="submit">Sign up now</button>
             </div>
             <small class="field-error" id="emailError">Enter your email.</small>
           </form>
         </div>
+        <p class="footer-bottom">&copy; Built with pride and care by ThemeBubble. All rights reserved.</p>
       </div>
       <button id="go-to-top" type="button" aria-label="Go to top">↑</button>
     </footer>
 
+    <div class="room-modal" id="roomModal" role="dialog" aria-modal="true" aria-labelledby="roomModalTitle" aria-hidden="true">
+      <button class="modal-backdrop" type="button" data-close-room aria-label="Close room details"></button>
+      <article class="room-modal-card">
+        <button class="modal-close" type="button" data-close-room aria-label="Close room details">Close</button>
+        <div class="room-modal-media">
+          <img id="roomModalImage" src="./Images/Room - Standard.jpg" alt="" />
+        </div>
+        <div class="room-modal-copy">
+          <p class="eyebrow dark" id="roomModalPrice">From $60 / night</p>
+          <h2 id="roomModalTitle">Standard Room</h2>
+          <p id="roomModalDescription"></p>
+          <div class="room-modal-stats" id="roomModalStats"></div>
+          <ul id="roomModalAmenities"></ul>
+          <a class="primary-btn" href="#booking" data-close-room>Reserve this stay</a>
+        </div>
+      </article>
+    </div>
+
+    <div class="lightbox" id="galleryLightbox" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle" aria-hidden="true">
+      <button class="lightbox-backdrop" type="button" data-close-gallery aria-label="Close gallery image"></button>
+      <figure class="lightbox-card">
+        <button class="modal-close" type="button" data-close-gallery aria-label="Close gallery image">Close</button>
+        <img id="lightboxImage" src="./Images/Slider 1.jpg" alt="" />
+        <figcaption>
+          <span class="eyebrow dark" id="lightboxKicker">Gallery</span>
+          <strong id="lightboxTitle">Golden hour lounge</strong>
+        </figcaption>
+      </figure>
+    </div>
+
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-      onerror="this.remove()"
     ></script>
-    <script src="dom.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"
+    ></script>
+    <script src="dom.js?v=20260528-fix2"></script>
   </body>
 </html>
