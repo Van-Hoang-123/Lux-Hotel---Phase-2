@@ -1080,6 +1080,36 @@ select:focus {
     text-transform: uppercase;
 }
 
+.auth-profile {
+    display: grid;
+    gap: 6px;
+    border: 1px solid rgba(17, 122, 72, 0.18);
+    border-radius: 8px;
+    padding: 18px;
+    background: rgba(17, 122, 72, 0.06);
+}
+
+.auth-profile span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.auth-profile strong {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1.1;
+}
+
+.auth-profile small {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
 .auth-shell .form-status {
     margin-top: 14px;
 }
