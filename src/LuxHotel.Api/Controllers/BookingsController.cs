@@ -1,10 +1,10 @@
 ﻿
-using Microsoft.AspNetCore.Mvc;
 using LuxHotel.Application.Dtos;
 using LuxHotel.Domain.Entities;
 using LuxHotel.Infrastructure.Persistence;
-
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace LuxHotel.Api.Controllers
@@ -121,7 +121,7 @@ namespace LuxHotel.Api.Controllers
                 Children = request.Children,
                 TotalPrice = totalNights * room.PricePerNight,
                 BookingStatus = "Confirmed",
-                CreatedAt = DateTime.Now 
+                CreatedAt = DateTime.Now
             };
 
 
@@ -190,28 +190,35 @@ namespace LuxHotel.Api.Controllers
             return Ok(myBookings);
         }
 
-        [HttpPatch("/toogleRoomAvailableStatus/{id}")]
-        public IActionResult toogleRoomAvailableStatus(int id)
+        [HttpPatch("toggle-room-status/{id}")] 
+        public async Task<IActionResult> ToggleRoomAvailableStatus(int id)
         {
-            var Room = _context.Rooms.FirstOrDefault(x => x.Id == id);
+           
+            var room = await _context.Rooms.FirstOrDefaultAsync(x => x.Id == id);
 
-            if(Room == null)
+            if (room == null)
             {
                 return NotFound(new { message = "Room Not Found" });
             }
 
-            if (Room.IsAvailable)
+           
+            // Khách chưa rời đi, hoặc sắp tới có khách tới ở)
+            bool isRoomBooked = await _context.Bookings.AnyAsync(booking =>
+                booking.RoomId == room.Id &&
+                booking.DepartureDate > DateTime.UtcNow);
+
+     
+            if (isRoomBooked && room.IsAvailable)
             {
-                Room.IsAvailable = false;
-            }
-            else
-            {
-                Room.IsAvailable = true;
+                return BadRequest(new { message = "Cannot disable this room because it is currently booked for upcoming dates." });
             }
 
-            _context.SaveChanges();
+            //  Toggle trạng thái 
+            room.IsAvailable = !room.IsAvailable;
+
+            await _context.SaveChangesAsync();
+
             return NoContent();
         }
-
     }
 }
