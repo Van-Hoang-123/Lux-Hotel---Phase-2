@@ -1,7 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
+using LuxHotel.Application.Dtos;
+using LuxHotel.Domain.Entities;
+using LuxHotel.Domain.Interfaces;
+using LuxHotel.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using LuxHotel.Infrastructure.Persistence;
 
 namespace LuxHotel.Api.Controllers
 {
@@ -9,35 +13,95 @@ namespace LuxHotel.Api.Controllers
     [ApiController]
     public class RoomsController : ControllerBase
     {
-        private readonly LuxHotelDbContext _context;
-        private readonly IWebHostEnvironment _env;
-        public RoomsController(LuxHotelDbContext context, IWebHostEnvironment env)
+        private readonly IRoomRepository _context;
+        public RoomsController(IRoomRepository context)
         {
             _context = context;
-            _env = env;
         }
 
+        // GET /api/rooms
         [HttpGet]
-        public async Task<IActionResult> GetAllRooms()
+        public async Task<IActionResult> GetAll()
         {
-            var rooms = await _context.Rooms.ToListAsync();
-            return Ok(rooms);
+            var rooms = await _context.GetAllAsync();
+            var result = rooms.Select(r => new RoomDto
+            {
+                Id = r.Id,
+                RoomType = r.RoomType,
+                PricePerNight = r.PricePerNight,
+                ImageUrl = r.ImageUrl,
+                Description = r.Description,
+                IsAvailable = r.IsAvailable
+            });
+            return Ok(result);
         }
 
-        [HttpGet("{id}")] // Test Get Book By Id
-        public async Task<IActionResult> GetRoomById(int id)
+        // GET /api/rooms/{id}
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
         {
-            // Tìm phòng trong Database dựa vào Id truyền lên
-            var room = await _context.Rooms.FindAsync(id);
+            var room = await _context.GetByIdAsync(id);
+            if (room is null)
+                return NotFound(new { message = $"Room {id} not found." });
 
-            // Nếu không tìm thấy phòng, trả về mã trạng thái HTTP 404 Not Found
-            if (room == null)
+            return Ok(new RoomDto
             {
-                return NotFound(new { message = $"Không tìm thấy phòng nào có Id = {id}." });
-            }
+                Id = room.Id,
+                RoomType = room.RoomType,
+                PricePerNight = room.PricePerNight,
+                ImageUrl = room.ImageUrl,
+                Description = room.Description,
+                IsAvailable = room.IsAvailable
+            });
+        }
 
-            // Nếu tìm thấy, trả về mã trạng thái HTTP 200 OK kèm theo dữ liệu của phòng (JSON)
-            return Ok(room);
+        // POST /api/rooms
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create([FromBody] CreateRoomDto dto)
+        {
+            var room = new Room
+            {
+                RoomType = dto.RoomType,
+                PricePerNight = dto.PricePerNight,
+                ImageUrl = dto.ImageUrl,
+                Description = dto.Description,
+                IsAvailable = true
+            };
+            var created = await _context.CreateAsync(room);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+
+        // PUT /api/rooms/1
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateRoomDto dto)
+        {
+            var room = new Room
+            {
+                RoomType = dto.RoomType,
+                PricePerNight = dto.PricePerNight,
+                ImageUrl = dto.ImageUrl,
+                Description = dto.Description,
+                IsAvailable = dto.IsAvailable
+            };
+            var updated = await _context.UpdateAsync(id, room);
+            if (updated is null)
+                return NotFound(new { message = $"Room {id} not found." });
+
+            return Ok(updated);
+        }
+
+        // DELETE /api/rooms/1
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var success = await _context.DeleteAsync(id);
+            if (!success)
+                return NotFound(new { message = $"Room {id} not found." });
+
+            return NoContent();
         }
     }
 }
