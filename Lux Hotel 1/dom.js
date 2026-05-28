@@ -607,7 +607,7 @@ function showToast(type, message) {
 
 function setBookingStatus(type, message) {
   const status = $("#bookingStatus");
-  status.className = `form-status ${type ? `is-visible ${type}` : ""}`;
+  status.className = `form-status booking-status ${type ? type : ""}`;
   status.textContent = message || "";
   if (type && message) showToast(type, message);
 }
