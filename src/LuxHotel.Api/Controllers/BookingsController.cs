@@ -33,7 +33,7 @@ namespace LuxHotel.Api.Controllers
             
             if(request.Children < 0)
             {
-                return BadRequest(new { message = "The Number of Chilren Must Be More Than 0" });
+                return BadRequest(new { message = "The Number of Chilren Must Be More Than Or Equals 0" });
             }
 
             var arrival = request.ArrivalDate.Value;
@@ -74,7 +74,7 @@ namespace LuxHotel.Api.Controllers
 
             if (request.Children < 0)
             {
-                return BadRequest(new { message = "The Number of Chilren Must Be More Than 0" });
+                return BadRequest(new { message = "The Number of Chilren Must Be More Than Or Equals 0" });
             }
 
             // Đổi sang FirstOrDefaultAsync
