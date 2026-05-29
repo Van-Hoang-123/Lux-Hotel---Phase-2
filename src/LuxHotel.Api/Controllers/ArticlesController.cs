@@ -146,7 +146,7 @@ namespace LuxHotel.Api.Controllers
             _context.Articles.Add(newArticle);
             await _context.SaveChangesAsync();
 
-            return Ok(newArticle);
+            return Created(string.Empty, new { message = "create successful" });
         }
 
         [Authorize(Roles = "Admin")]
