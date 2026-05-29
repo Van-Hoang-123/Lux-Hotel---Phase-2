@@ -4,4 +4,6 @@ public enum RoomSortBy
 {
     Id,
     PricePerNight,
+    Capacity,
+    RoomType
 }

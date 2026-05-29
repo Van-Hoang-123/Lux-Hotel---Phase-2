@@ -20,16 +20,27 @@ namespace LuxHotel.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<Room>> GetAllAsync(
-     RoomSortBy sortBy = RoomSortBy.Id,
-     bool descending = false)
-        {
+        public async Task<IEnumerable<Room>> GetAllAsync(RoomSortBy sortBy = RoomSortBy.Id, SortOrder order = SortOrder.Asc)       
+            {
             IQueryable<Room> query = _context.Rooms;
-
+            bool desc = order == SortOrder.Desc;
             query = sortBy switch
             {
-                RoomSortBy.PricePerNight => descending ? query.OrderByDescending(r => r.PricePerNight) : query.OrderBy(r => r.PricePerNight),
-                _ => descending ? query.OrderByDescending(r => r.Id) : query.OrderBy(r => r.Id)
+                RoomSortBy.PricePerNight => desc
+                    ? query.OrderByDescending(r => r.PricePerNight)
+                    : query.OrderBy(r => r.PricePerNight),
+
+                RoomSortBy.Capacity => desc
+                    ? query.OrderByDescending(r => r.Capacity)
+                    : query.OrderBy(r => r.Capacity),
+
+                RoomSortBy.RoomType => desc
+                    ? query.OrderByDescending(r => r.RoomType)
+                    : query.OrderBy(r => r.RoomType),
+
+                _ => desc
+                    ? query.OrderByDescending(r => r.Id)
+                    : query.OrderBy(r => r.Id)
             };
 
             return await query.ToListAsync();
@@ -55,6 +66,7 @@ namespace LuxHotel.Infrastructure.Repositories
             existing.ImageUrl = room.ImageUrl;
             existing.Description = room.Description;
             existing.IsAvailable = room.IsAvailable;
+            existing.Capacity = room.Capacity;
 
             await _context.SaveChangesAsync();
             return existing;

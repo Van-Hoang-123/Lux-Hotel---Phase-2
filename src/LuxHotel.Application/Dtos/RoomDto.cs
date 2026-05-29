@@ -9,7 +9,7 @@ namespace LuxHotel.Application.Dtos
     public class GetRoomsQueryDto
     {
         public RoomSortBy SortBy { get; set; } = RoomSortBy.Id;
-        public bool Descending { get; set; } = false;
+        public SortOrder Order { get; set; } = SortOrder.Asc; 
     }
     public class RoomDto
     {
@@ -19,6 +19,7 @@ namespace LuxHotel.Application.Dtos
         public string ImageUrl { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public bool IsAvailable { get; set; }
+        public int Capacity { get; set; }
     }
     public class CreateRoomDto
     {
@@ -26,6 +27,7 @@ namespace LuxHotel.Application.Dtos
         public decimal PricePerNight { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public int Capacity { get; set; }
     }
 
     public class UpdateRoomDto : CreateRoomDto
