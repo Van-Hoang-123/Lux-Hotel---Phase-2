@@ -71,8 +71,10 @@ builder.Services.AddAuthorization(options =>
 });
 
 //builder.Services.AddValidatorsFromAssemblyContaining<BookingValidator>(); * REMOVED BY QuangTu
+builder.Services.AddValidatorsFromAssemblyContaining<RoomValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
+
 
 builder.Services.AddAntiforgery(options =>
 {

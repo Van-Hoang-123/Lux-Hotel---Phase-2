@@ -1,12 +1,12 @@
 using LuxHotel.Application.Dtos;
 using LuxHotel.Domain.Entities;
+using LuxHotel.Domain.Enums;
 using LuxHotel.Domain.Interfaces;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using LuxHotel.Domain.Enums;
 
 namespace LuxHotel.Api.Controllers
 {
