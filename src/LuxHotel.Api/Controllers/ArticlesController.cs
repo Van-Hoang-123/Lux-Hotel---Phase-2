@@ -53,7 +53,7 @@ namespace LuxHotel.Api.Controllers
             
             var query = _context.Articles.AsQueryable();
 
-            //  Đếm tổng số lượng từ query gốc
+            
             var totalItems = await query.CountAsync();
 
             //  Lấy dữ liệu phân trang, lúc này mới cần AsNoTracking()
