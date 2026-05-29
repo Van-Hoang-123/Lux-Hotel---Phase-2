@@ -3,9 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+using LuxHotel.Domain.Enums;
 namespace LuxHotel.Application.Dtos
 {
+    public class GetRoomsQueryDto
+    {
+        public RoomSortBy SortBy { get; set; } = RoomSortBy.Id;
+        public bool Descending { get; set; } = false;
+    }
     public class RoomDto
     {
         public int Id { get; set; }

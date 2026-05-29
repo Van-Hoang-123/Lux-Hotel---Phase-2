@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using LuxHotel.Domain.Enums;
 
 namespace LuxHotel.Api.Controllers
 {
@@ -20,10 +21,11 @@ namespace LuxHotel.Api.Controllers
         }
 
         // GET /api/rooms
+        // GET /api/rooms?sortBy=pricePerNight&descending=true
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetRoomsQueryDto query)
         {
-            var rooms = await _context.GetAllAsync();
+            var rooms = await _context.GetAllAsync(query.SortBy, query.Descending);
             var result = rooms.Select(r => new RoomDto
             {
                 Id = r.Id,
