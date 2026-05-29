@@ -10,6 +10,7 @@ namespace LuxHotel.Infrastructure.Persistence
     public class LuxHotelDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     {
         public LuxHotelDbContext(DbContextOptions<LuxHotelDbContext> options) : base(options) { }
+        public DbSet<User> User { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<Article> Articles { get; set; }
