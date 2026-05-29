@@ -1381,6 +1381,9 @@ select:focus {
     border-radius: 50%;
     background: var(--gold);
     color: #fff;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    font-size: 22px;
+    line-height: 1;
     box-shadow: rgba(23, 19, 15, 0.2) 0 14px 32px;
 }
 
