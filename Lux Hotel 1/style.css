@@ -1378,13 +1378,19 @@ select:focus {
     width: 44px;
     height: 44px;
     border: 0;
-    border-radius: 50%;
-    background: var(--gold);
-    color: #fff;
+    padding: 0;
+    background: transparent;
+    color: var(--gold);
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-    font-size: 22px;
+    font-size: 30px;
     line-height: 1;
-    box-shadow: rgba(23, 19, 15, 0.2) 0 14px 32px;
+    filter: drop-shadow(0 8px 14px rgba(23, 19, 15, 0.22));
+}
+
+#go-to-top span {
+    display: inline-block;
+    transform: rotate(-45deg);
+    transform-origin: center;
 }
 
 .room-modal,
