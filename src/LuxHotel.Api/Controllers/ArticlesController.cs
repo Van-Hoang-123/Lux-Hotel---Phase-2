@@ -41,9 +41,9 @@ namespace LuxHotel.Api.Controllers
             return Ok(article);
         }
 
-        [HttpGet("/api/articles")] // Đổi thành route gốc sẽ chuẩn RESTful hơn
+        [HttpGet("/api/articles/pagination")]
         public async Task<ActionResult<PagedResultDTO<Article>>> getArticlesPagination(
-                [FromQuery] int pageNumber = 1, 
+                [FromQuery] int pageNumber = 1,
                 [FromQuery] int pageSize = 10)
         {
             if (pageNumber < 1) pageNumber = 1;
@@ -84,7 +84,7 @@ namespace LuxHotel.Api.Controllers
 
         [HttpGet("/api/articles/getByCategory/{category}")]
 
-        public async Task<ActionResult<List<Article>>> getArticlesByCategoryName( string category)
+        public async Task<ActionResult<List<Article>>> getArticlesByCategoryName(string category)
         {
             if (string.IsNullOrWhiteSpace(category))
             {
@@ -96,7 +96,7 @@ namespace LuxHotel.Api.Controllers
                 return BadRequest(new { message = "Inavailable category name. Category must be: Daily, Blog, Event" });
             }
 
-            var articles = await _context.Articles.Where(x => x.Category == category).ToListAsync();
+            var articles = await _context.Articles.AsNoTracking().Where(x => x.Category == category).ToListAsync();
 
             return Ok(articles);
         }
@@ -105,7 +105,7 @@ namespace LuxHotel.Api.Controllers
         // Filters
 
 
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [HttpPost("/api/articles")]
         public async Task<IActionResult> createNewArticle(ArticleCreateRequest request)
         {
@@ -117,7 +117,7 @@ namespace LuxHotel.Api.Controllers
 
             if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out Guid userId))
             {
-                return Unauthorized("Token không hợp lệ hoặc thiếu thông tin User ID.");
+                return Unauthorized();
             }
 
             //  Tìm User trong DB
@@ -129,7 +129,7 @@ namespace LuxHotel.Api.Controllers
                 return NotFound("Author not found.");
             }
 
-            
+
 
             //  Khởi tạo bài viết (An toàn tuyệt đối)
             var newArticle = new Article()
@@ -149,19 +149,16 @@ namespace LuxHotel.Api.Controllers
             return Ok(newArticle);
         }
 
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [HttpPut("/api/articles/edit/{id}")]
 
         public async Task<ActionResult<Article>> editArticles(int id, [FromBody] ArticleEditRequest request)
         {
             var article = await _context.Articles.FirstOrDefaultAsync(x => x.Id == id);
-
             if (article == null)
             {
                 return NotFound(new { message = "Article not found" });
             }
-
-           
 
             article.Title = request.Title;
             article.Category = request.Category;
@@ -169,38 +166,15 @@ namespace LuxHotel.Api.Controllers
             article.Content = request.Content;
 
             await _context.SaveChangesAsync();
-
             return Ok(article);
-
         }
 
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [HttpDelete("/api/articles/delete/{id}")]
 
         public async Task<IActionResult> deleteArticleById(int id)
         {
-
-            //  Lấy và kiểm tra ID từ Token một cách an toàn
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out Guid userId))
-            {
-                return Unauthorized("Token không hợp lệ hoặc thiếu thông tin User ID.");
-            }
-
-            //  Tìm User trong DB
-            User author = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
-
-            //  Rào lỗi: Nếu không tìm thấy User trong DB thì báo lỗi 404 ngay
-            if (author == null)
-            {
-                return NotFound("Author not found.");
-            }
-
-            // Kiểm tra Article hợp lệ 
-
             var article = await _context.Articles.FirstOrDefaultAsync(x => x.Id == id);
-
             if (article == null)
             {
                 return NotFound("Article not found");
@@ -209,7 +183,7 @@ namespace LuxHotel.Api.Controllers
             _context.Articles.Remove(article);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Delete sucessfully" });
+            return Ok(new { message = "Delete successfully" });
         }
     }
 }
