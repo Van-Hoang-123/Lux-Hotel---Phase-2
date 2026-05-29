@@ -50,7 +50,7 @@ namespace LuxHotel.Api.Controllers
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 50) pageSize = 50;
 
-            //  Tạo query gốc
+            
             var query = _context.Articles.AsQueryable();
 
             //  Đếm tổng số lượng từ query gốc
