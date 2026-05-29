@@ -131,7 +131,7 @@ namespace LuxHotel.Api.Controllers
 
 
 
-            //  Khởi tạo bài viết (An toàn tuyệt đối)
+            
             var newArticle = new Article()
             {
                 Title = request.Title,
