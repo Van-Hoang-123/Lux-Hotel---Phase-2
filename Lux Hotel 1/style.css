@@ -102,6 +102,7 @@ a {
 img {
     max-width: 100%;
     display: block;
+    background: var(--sand);
 }
 
 button,
@@ -721,6 +722,17 @@ select:focus {
     padding: clamp(82px, 11vw, 142px) 0;
 }
 
+.intro-section,
+.rooms-section,
+.amenities-section,
+.gallery-section,
+.reviews-section,
+.journal-section,
+.account-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 760px;
+}
+
 .intro-grid {
     display: grid;
     grid-template-columns: 1fr minmax(260px, 380px) 1fr;
@@ -839,6 +851,17 @@ select:focus {
     object-fit: cover;
     transform: scale(1.001);
     transition: transform 0.5s ease;
+}
+
+.room-media img,
+.journal-card img,
+.gallery-item img,
+.review-card img,
+.intro-grid img,
+.experience-section > img,
+.room-modal-media img,
+.lightbox-card img {
+    backface-visibility: hidden;
 }
 
 .room-card:hover .room-media img {
@@ -1022,6 +1045,13 @@ select:focus {
     color: #fff;
     isolation: isolate;
     position: relative;
+    transition: background-color 0.24s ease, transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.amenity-card:not(.is-bg-loaded) {
+    background:
+        linear-gradient(135deg, rgba(185, 152, 103, 0.16), rgba(21, 17, 13, 0.9)),
+        var(--deep);
 }
 
 .amenity-card::before {
@@ -1123,6 +1153,7 @@ select:focus {
     width: 56px;
     height: 56px;
     border-radius: 50%;
+    object-fit: cover;
 }
 
 .review-card h3 {
@@ -1764,6 +1795,27 @@ select:focus {
     .lightbox-card figcaption {
         display: grid;
     }
+}
+
+.low-power .room-card:hover,
+.low-power .amenity-card:hover,
+.low-power .review-card:hover,
+.low-power .journal-card:hover,
+.low-power .gallery-item:hover {
+    transform: none;
+}
+
+.low-power .room-media img,
+.low-power .journal-card img,
+.low-power .gallery-item img {
+    transform: none;
+    transition: none;
+}
+
+.low-power .room-card:hover .room-media img,
+.low-power .journal-card:hover img,
+.low-power .gallery-item:hover img {
+    transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

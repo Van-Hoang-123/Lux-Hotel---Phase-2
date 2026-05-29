@@ -43,6 +43,13 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
   ? localStorage.getItem(languageStorageKey)
   : "en";
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isLowPowerDevice =
+  prefersReducedMotion ||
+  navigator.connection?.saveData ||
+  (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+  (navigator.deviceMemory && navigator.deviceMemory <= 4);
+document.documentElement.classList.toggle("low-power", Boolean(isLowPowerDevice));
 
 const translations = {
   en: {
@@ -938,7 +945,7 @@ function renderRooms() {
         <article class="room-card">
           <button class="room-card-button" type="button" data-room-index="${index}" aria-label="${escapeHtml(t("rooms.viewDetailsAria", { room: title }))}">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
             </div>
             <div class="content">
               <p class="price">${escapeHtml(roomPrice(room))}</p>
@@ -976,7 +983,7 @@ function renderReviews() {
       (review) => `
         <article class="review-card">
           <header>
-            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" />
+            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" fetchpriority="low" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
               <p>${escapeHtml(t("common.verifiedGuest"))}</p>
@@ -994,7 +1001,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" fetchpriority="low" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>
@@ -1012,7 +1019,7 @@ function renderGallery() {
       const title = localized(item, "title");
       return `
         <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="${escapeHtml(t("gallery.openAria", { title }))}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" />
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
           <span>
             <small>${escapeHtml(localized(item, "kicker"))}</small>
             <strong>${escapeHtml(title)}</strong>
@@ -1027,12 +1034,34 @@ function setupLazyBackgrounds(root = document) {
   const cards = $$("[data-bg]", root);
   if (!cards.length) return;
 
+  const runWhenIdle = (callback) => {
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(callback, { timeout: 900 });
+      return;
+    }
+
+    window.setTimeout(callback, 80);
+  };
+
   const loadBackground = (card) => {
     const image = card.dataset.bg;
-    if (!image) return;
-    card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
-    card.classList.add("is-bg-loaded");
-    card.removeAttribute("data-bg");
+    if (!image || card.classList.contains("is-bg-loading")) return;
+
+    card.classList.add("is-bg-loading");
+    const loader = new Image();
+    loader.decoding = "async";
+    loader.onload = () => {
+      runWhenIdle(() => {
+        card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
+        card.classList.add("is-bg-loaded");
+        card.removeAttribute("data-bg");
+      });
+    };
+    loader.onerror = () => {
+      card.classList.remove("is-bg-loading");
+      card.removeAttribute("data-bg");
+    };
+    loader.src = image;
   };
 
   if (!("IntersectionObserver" in window)) {
@@ -1048,7 +1077,7 @@ function setupLazyBackgrounds(root = document) {
         observer.unobserve(entry.target);
       });
     },
-    { rootMargin: "240px 0px" }
+    { rootMargin: isLowPowerDevice ? "900px 0px" : "640px 0px" }
   );
 
   cards.forEach((card) => observer.observe(card));
@@ -1693,9 +1722,8 @@ function setupGalleryLightbox() {
 
 function setupMagneticButtons() {
   const gsap = window.gsap;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  if (!gsap || reducedMotion || coarsePointer) return;
+  if (!gsap || isLowPowerDevice || coarsePointer) return;
 
   const buttons = $$(
     ".primary-btn, .ghost-btn, .nav-cta, .language-switch button, .theme-toggle, .booking-form button, .newsletter-row button, .auth-tabs button, .auth-form button, .auth-logout, .experience-actions button, .hero-controls button"
@@ -1717,8 +1745,7 @@ function setupMagneticButtons() {
 
 function setupAnimations() {
   const gsap = window.gsap;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!gsap || reducedMotion) return;
+  if (!gsap || prefersReducedMotion) return;
 
   const scrollTrigger = window.ScrollTrigger;
   if (scrollTrigger) gsap.registerPlugin(scrollTrigger);
@@ -1744,6 +1771,7 @@ function setupAnimations() {
     .from(".hero-controls", { opacity: 0, duration: 0.45 }, "-=0.35");
 
   if (!scrollTrigger) return;
+  if (isLowPowerDevice) return;
 
   gsap.to(".hero-slide", {
     yPercent: 8,
