@@ -810,6 +810,7 @@ const fallbackJournal = [
   {
     title: "Staying in Style Forever",
     titleVi: "Nghỉ Dưỡng Thanh Lịch",
+    slug: "staying-in-style-forever",
     image: "./Images/va0ymkiftpa-368x268.jpg",
     tag: "Lifestyle",
     tagVi: "Phong cách sống",
@@ -819,6 +820,7 @@ const fallbackJournal = [
   {
     title: "Electric Feel And Other Things",
     titleVi: "Cảm Hứng Từ Đảo",
+    slug: "electric-feel-and-other-things",
     image: "./Images/iStock_000002993908_Medium-1-1-368x268.jpg",
     tag: "Island",
     tagVi: "Hòn đảo",
@@ -828,6 +830,7 @@ const fallbackJournal = [
   {
     title: "Why Hotel Comfort Matters",
     titleVi: "Vì Sao Sự Thoải Mái Quan Trọng",
+    slug: "why-hotel-comfort-matters",
     image: "./Images/ihwo0unctps-368x268.jpg",
     tag: "Design",
     tagVi: "Thiết kế",
@@ -838,12 +841,35 @@ const fallbackJournal = [
 
 let journal = [...fallbackJournal];
 
+function journalKey(post) {
+  return String(post?.slug || post?.title || "").trim().toLowerCase();
+}
+
+function findKnownJournalPost(article, title) {
+  const slug = String(article.slug || "").trim().toLowerCase();
+  const normalizedTitle = String(title || "").trim().toLowerCase();
+  return fallbackJournal.find((post) => post.slug === slug || post.title.toLowerCase() === normalizedTitle);
+}
+
+function completeJournalPosts(posts) {
+  const seen = new Set(posts.map(journalKey).filter(Boolean));
+  const missingPosts = fallbackJournal.filter((post) => !seen.has(journalKey(post)));
+  return [...posts, ...missingPosts].slice(0, 3);
+}
+
 function normalizeArticle(article) {
+  const title = article.title || t("journal.defaultTitle");
+  const knownPost = findKnownJournalPost(article, title);
+
   return {
-    title: article.title || t("journal.defaultTitle"),
-    image: localImagePath(article.coverImageUrl, "./Images/va0ymkiftpa-368x268.jpg"),
-    tag: article.slug ? article.slug.replaceAll("-", " ") : t("journal.defaultTag"),
+    title,
+    titleVi: knownPost?.titleVi,
+    slug: article.slug || knownPost?.slug || "",
+    image: localImagePath(article.coverImageUrl, knownPost?.image || "./Images/va0ymkiftpa-368x268.jpg"),
+    tag: knownPost?.tag || (article.slug ? article.slug.replaceAll("-", " ") : t("journal.defaultTag")),
+    tagVi: knownPost?.tagVi,
     copy: article.summary || article.content || t("journal.defaultCopy"),
+    copyVi: knownPost?.copyVi,
   };
 }
 
@@ -1056,7 +1082,7 @@ async function fetchArticles() {
     const articles = Array.isArray(data) ? data : data?.items || [];
     if (!articles.length) return;
 
-    journal = articles.map(normalizeArticle);
+    journal = completeJournalPosts(articles.map(normalizeArticle));
     renderJournal();
     window.ScrollTrigger?.refresh();
   } catch (error) {

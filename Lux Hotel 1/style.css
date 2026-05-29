@@ -759,6 +759,10 @@ select:focus {
     margin-bottom: 36px;
 }
 
+.journal-section .section-heading {
+    max-width: 1080px;
+}
+
 .section-heading.center {
     margin-right: auto;
     margin-left: auto;
@@ -883,7 +887,7 @@ select:focus {
 }
 
 .journal-card .content {
-    padding: 20px;
+    padding: 22px;
 }
 
 .room-card .content strong {
@@ -922,6 +926,12 @@ select:focus {
     margin-bottom: 8px;
     font-size: 25px;
     line-height: 1.1;
+}
+
+.journal-card h3 {
+    font-size: clamp(22px, 1.8vw, 24px);
+    line-height: 1.14;
+    overflow-wrap: normal;
 }
 
 .room-card p,
@@ -1120,7 +1130,7 @@ select:focus {
 }
 
 .journal-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(260px, 1fr));
 }
 
 .journal-card .tag {
