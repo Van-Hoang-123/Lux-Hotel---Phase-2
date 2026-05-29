@@ -30,6 +30,11 @@ namespace LuxHotel.Api.Controllers
 
             if (request.Adult < 1)
                 return BadRequest(new { message = "The Number Of Adults Must Be More Than Or Equal To 1" });
+            
+            if(request.Children < 0)
+            {
+                return BadRequest(new { message = "The Number of Chilren Must Be More Than 1" });
+            }
 
             var arrival = request.ArrivalDate.Value;
             var departure = request.DepartureDate.Value;
@@ -41,8 +46,8 @@ namespace LuxHotel.Api.Controllers
                    && (room.Capacity * 2) >= requiredDoubleCapacity
                    && !_context.Bookings.Any(booking =>
                         booking.RoomId == room.Id
-                        && booking.BookingStatus != "Cancelled" // <-- Thêm dòng này
-                        && booking.BookingStatus != "CheckedOut" // <-- Thêm dòng này
+                        && booking.BookingStatus != "Cancelled" // 
+                        && booking.BookingStatus != "CheckedOut" //
                         && arrival < booking.DepartureDate
                         && departure > booking.ArrivalDate))
     .ToListAsync();
@@ -67,6 +72,11 @@ namespace LuxHotel.Api.Controllers
             if (request.Adult < 1)
                 return BadRequest(new { message = "The number of adults must be at least 1." });
 
+            if (request.Children < 0)
+            {
+                return BadRequest(new { message = "The Number of Chilren Must Be More Than 1" });
+            }
+
             // Đổi sang FirstOrDefaultAsync
             var room = await _context.Rooms.FirstOrDefaultAsync(x => x.Id == request.RoomId);
             if (room == null || !room.IsAvailable)
@@ -82,8 +92,8 @@ namespace LuxHotel.Api.Controllers
             // Đổi sang AnyAsync
             bool isRoomBooked = await _context.Bookings.AnyAsync(booking =>
              booking.RoomId == room.Id &&
-             booking.BookingStatus != "Cancelled" && // <-- Thêm dòng này
-             booking.BookingStatus != "CheckedOut" && // <-- Thêm dòng này
+             booking.BookingStatus != "Cancelled" && //
+             booking.BookingStatus != "CheckedOut" && // 
              arrival < booking.DepartureDate &&
              departure > booking.ArrivalDate);
 
