@@ -1,11 +1,10 @@
-using LuxHotel.Application.Converters;
+﻿using LuxHotel.Application.Converters;
 using System.Text.Json.Serialization;
 
 namespace LuxHotel.Application.Dtos;
 
-public class BookingRequestDto
+public class CheckAvailableRooomsDTO
 {
-    public int RoomId { get; set; }
     [JsonConverter(typeof(CustomDateTimeFullConverter))]
     public DateTime? ArrivalDate { get; set; }
     [JsonConverter(typeof(CustomDateTimeFullConverter))]

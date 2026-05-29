@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="day">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,33 +11,43 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Serif:wght@600;700&display=swap"
       rel="stylesheet"
     />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
-      onerror="this.remove()"
     />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=20260528-i18n-theme" />
   </head>
   <body>
     <header class="site-header" id="top">
       <nav class="nav-shell" aria-label="Primary navigation">
-        <a class="brand" href="#top" aria-label="Lux Hotel home">
+        <a class="brand" href="#top" aria-label="Lux Hotel home" data-i18n-aria="brand.home">
           <span>Lux</span>
           <em>Hotel</em>
         </a>
-        <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false">
+        <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-i18n-aria="nav.openMenu">
           <span></span>
           <span></span>
         </button>
         <div class="nav-links">
-          <a href="#rooms">Rooms</a>
-          <a href="#dining">Dining</a>
-          <a href="#amenities">Amenities</a>
-          <a href="#journal">Journal</a>
-          <a class="nav-cta" href="#booking">Reserve</a>
+          <a href="#rooms" data-i18n="nav.rooms">Rooms</a>
+          <a href="#dining" data-i18n="nav.dining">Dining</a>
+          <a href="#amenities" data-i18n="nav.amenities">Amenities</a>
+          <a href="#gallery" data-i18n="nav.gallery">Gallery</a>
+          <a href="#journal" data-i18n="nav.journal">Journal</a>
+          <a href="#guest-account" data-i18n="nav.account">Account</a>
+          <div class="nav-tools" aria-label="Display preferences" data-i18n-aria="nav.preferences">
+            <div class="language-switch" role="group" aria-label="Language" data-i18n-aria="nav.language">
+              <button type="button" data-language-option="en" aria-pressed="true">EN</button>
+              <button type="button" data-language-option="vi" aria-pressed="false">VI</button>
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to night mode" data-i18n-aria="theme.switchToNight">
+              <span data-theme-label>Night</span>
+            </button>
+          </div>
+          <a class="nav-cta" href="#booking" data-i18n="nav.reserve">Reserve</a>
         </div>
       </nav>
     </header>
@@ -47,60 +57,62 @@
         <div class="hero-slide is-active" style="--hero-image: url('./Images/Slider 1.jpg')"></div>
         <div class="hero-slide" style="--hero-image: url('./Images/Slider 2.jpg')"></div>
         <div class="hero-overlay"></div>
+        <div class="hero-film" aria-hidden="true"></div>
 
         <div class="hero-content">
-          <p class="eyebrow">Amelia Island, Panama</p>
-          <h1 id="hero-title">A quieter kind of luxury.</h1>
-          <p class="hero-copy">
+          <p class="eyebrow" data-i18n="hero.eyebrow">Amelia Island, Panama</p>
+          <h1 id="hero-title" data-i18n="hero.title">A quieter kind of luxury.</h1>
+          <p class="hero-copy" data-i18n="hero.copy">
             Coastal suites, thoughtful dining, and island calm within minutes of the bay.
           </p>
           <div class="hero-actions">
-            <a class="primary-btn" href="#booking">Check availability</a>
-            <a class="ghost-btn" href="#rooms">Explore rooms</a>
+            <a class="primary-btn" href="#booking" data-i18n="hero.check">Check availability</a>
+            <a class="ghost-btn" href="#rooms" data-i18n="hero.explore">Explore rooms</a>
           </div>
         </div>
 
+        <div class="hero-signature" aria-label="Hotel highlights">
+          <span data-i18n="hero.chipVillas">Ocean-facing villas</span>
+          <span data-i18n="hero.chipDining">Private dining</span>
+          <span data-i18n="hero.chipConcierge">Island concierge</span>
+        </div>
+
         <div class="hero-controls" aria-label="Hero slider controls">
-          <button type="button" data-hero-prev aria-label="Previous hero image">Prev</button>
-          <button type="button" data-hero-next aria-label="Next hero image">Next</button>
+          <button type="button" data-hero-prev aria-label="Previous hero image" data-i18n="common.prev" data-i18n-aria="hero.prevAria">Prev</button>
+          <button type="button" data-hero-next aria-label="Next hero image" data-i18n="common.next" data-i18n-aria="hero.nextAria">Next</button>
         </div>
       </section>
 
       <section class="booking-panel" id="booking" aria-labelledby="booking-title">
         <form class="booking-form" id="check-form" novalidate>
           <div>
-            <span class="eyebrow dark">Reservations</span>
-            <h2 id="booking-title">Plan your stay.</h2>
+            <span class="eyebrow dark" data-i18n="booking.eyebrow">Reservations</span>
+            <h2 id="booking-title" data-i18n="booking.title">Plan your stay.</h2>
           </div>
+          <label class="room-field">
+            <span data-i18n="booking.room">Room</span>
+            <select id="roomSelect" name="roomId" aria-label="Choose room" data-i18n-aria="booking.chooseRoom"></select>
+          </label>
           <label>
-            <span>Arrival</span>
+            <span data-i18n="booking.arrival">Arrival</span>
             <input type="date" id="arrivalDate" name="arrivalDate" />
-            <small class="field-error" id="arrivalDateError">Choose an arrival date.</small>
+            <small class="field-error" id="arrivalDateError" data-i18n="errors.arrivalRequired">Choose an arrival date.</small>
           </label>
           <label>
-            <span>Departure</span>
+            <span data-i18n="booking.departure">Departure</span>
             <input type="date" id="departureDate" name="departureDate" />
-            <small class="field-error" id="departureDateError">Choose a departure date.</small>
+            <small class="field-error" id="departureDateError" data-i18n="errors.departureRequired">Choose a departure date.</small>
           </label>
           <label>
-            <span>Adults</span>
-            <select id="adult" name="adult">
-              <option value="1">1 adult</option>
-              <option value="2" selected>2 adults</option>
-              <option value="3">3 adults</option>
-              <option value="4">4 adults</option>
-            </select>
+            <span data-i18n="booking.adults">Adults</span>
+            <input type="number" id="adult" name="adultCount" min="1" max="20" step="1" value="1" inputmode="numeric" />
           </label>
           <label>
-            <span>Children</span>
-            <select id="children" name="children">
-              <option value="0" selected>No children</option>
-              <option value="1">1 child</option>
-              <option value="2">2 children</option>
-              <option value="3">3 children</option>
-            </select>
+            <span data-i18n="booking.children">Children</span>
+            <input type="number" id="children" name="childCount" min="0" max="20" step="1" value="0" inputmode="numeric" />
           </label>
-          <button type="submit">Search rooms</button>
+          <button type="submit" data-i18n="booking.search">Search rooms</button>
+          <p class="form-status booking-status" id="bookingStatus" role="status" aria-live="polite"></p>
         </form>
       </section>
 
@@ -108,18 +120,18 @@
         <div class="container-xl">
           <div class="intro-grid">
             <div>
-              <p class="eyebrow dark">Panama's finest hotel</p>
-              <h2>Golden-hour rooms, bay air, and a slower rhythm.</h2>
+              <p class="eyebrow dark" data-i18n="intro.eyebrow">Panama's finest hotel</p>
+              <h2 data-i18n="intro.title">Golden-hour rooms, bay air, and a slower rhythm.</h2>
             </div>
             <figure>
-              <img src="./Images/Panama's Finist Hotel.jpg" alt="Lux Hotel lounge and island view" />
+              <img src="./Images/Panama's Finist Hotel.jpg" alt="Lux Hotel lounge and island view" loading="lazy" decoding="async" data-i18n-alt="intro.imageAlt" />
             </figure>
             <div class="intro-copy">
-              <p>
+              <p data-i18n="intro.copyOne">
                 Make memories at Lux Hotel, Amelia Island, where southern charm, quiet scenery,
                 and casually elegant surroundings shape a calmer beachfront stay.
               </p>
-              <p>
+              <p data-i18n="intro.copyTwo">
                 Recently renewed rooms, organic dining, spa rituals, and personal concierge service
                 make the resort feel polished without becoming loud.
               </p>
@@ -131,26 +143,26 @@
       <section class="rooms-section section-pad" id="rooms">
         <div class="container-xl">
           <div class="section-heading">
-            <p class="eyebrow dark">Accommodation</p>
-            <h2>Suites and villas with room to breathe.</h2>
+            <p class="eyebrow dark" data-i18n="rooms.eyebrow">Accommodation</p>
+            <h2 data-i18n="rooms.title">Suites and villas with room to breathe.</h2>
           </div>
           <div class="room-grid" id="roomsGrid"></div>
         </div>
       </section>
 
       <section class="experience-section" id="dining">
-        <img src="./Images/Culinary Experience.jpg" alt="Dining at Lux Hotel" id="experienceImage" />
+        <img src="./Images/Culinary Experience.jpg" alt="Dining at Lux Hotel" id="experienceImage" loading="lazy" decoding="async" />
         <div class="experience-shade"></div>
         <div class="experience-content">
-          <p class="eyebrow">Dining & Spa</p>
+          <p class="eyebrow" data-i18n="experience.eyebrow">Dining & Spa</p>
           <h2 id="experienceTitle">Culinary Experience</h2>
           <p id="experienceCopy">
             Organic garden ingredients, quiet table service, and menus built around the island.
           </p>
           <div class="experience-actions">
-            <a class="primary-btn light" href="#booking">Book now</a>
-            <button type="button" data-exp-prev>Prev</button>
-            <button type="button" data-exp-next>Next</button>
+            <a class="primary-btn light" href="#booking" data-i18n="experience.book">Book now</a>
+            <button type="button" data-exp-prev data-i18n="common.prev">Prev</button>
+            <button type="button" data-exp-next data-i18n="common.next">Next</button>
           </div>
         </div>
       </section>
@@ -158,18 +170,28 @@
       <section class="amenities-section section-pad" id="amenities">
         <div class="container-xl">
           <div class="section-heading center">
-            <p class="eyebrow dark">Vacation at ease</p>
-            <h2>Every detail handled before you ask.</h2>
+            <p class="eyebrow dark" data-i18n="amenities.eyebrow">Vacation at ease</p>
+            <h2 data-i18n="amenities.title">Every detail handled before you ask.</h2>
           </div>
           <div class="amenity-grid" id="amenitiesGrid"></div>
+        </div>
+      </section>
+
+      <section class="gallery-section section-pad" id="gallery">
+        <div class="container-xl">
+          <div class="section-heading">
+            <p class="eyebrow dark" data-i18n="gallery.eyebrow">Gallery</p>
+            <h2 data-i18n="gallery.title">Small scenes from a quieter stay.</h2>
+          </div>
+          <div class="gallery-grid" id="galleryGrid"></div>
         </div>
       </section>
 
       <section class="reviews-section section-pad">
         <div class="container-xl">
           <div class="section-heading center">
-            <p class="eyebrow dark">Guest notes</p>
-            <h2>Quiet service. Clear memories.</h2>
+            <p class="eyebrow dark" data-i18n="reviews.eyebrow">Guest notes</p>
+            <h2 data-i18n="reviews.title">Quiet service. Clear memories.</h2>
           </div>
           <div class="review-grid" id="reviewsGrid"></div>
         </div>
@@ -178,10 +200,69 @@
       <section class="journal-section section-pad" id="journal">
         <div class="container-xl">
           <div class="section-heading">
-            <p class="eyebrow dark">Journal</p>
-            <h2>Stories from the island.</h2>
+            <p class="eyebrow dark" data-i18n="journal.eyebrow">Journal</p>
+            <h2 data-i18n="journal.title">Stories from the island.</h2>
           </div>
           <div class="journal-grid" id="journalGrid"></div>
+        </div>
+      </section>
+
+      <section class="account-section section-pad" id="guest-account" aria-labelledby="account-title">
+        <div class="container-xl">
+          <div class="account-layout">
+            <div class="account-copy">
+              <p class="eyebrow dark" data-i18n="account.eyebrow">Guest account</p>
+              <h2 id="account-title" data-i18n="account.title">Manage your Lux Hotel stay.</h2>
+              <p id="accountSummary">Sign in to keep your booking profile ready before arrival.</p>
+            </div>
+            <div class="auth-shell">
+              <div class="auth-tabs" role="tablist" aria-label="Guest account forms" data-i18n-aria="account.formsAria">
+                <button class="is-active" type="button" id="loginTab" data-auth-tab="login" role="tab" aria-selected="true" aria-controls="loginForm" data-i18n="account.login">Login</button>
+                <button type="button" id="registerTab" data-auth-tab="register" role="tab" aria-selected="false" aria-controls="registerForm" data-i18n="account.register">Register</button>
+              </div>
+              <form class="auth-form is-active" id="loginForm" data-auth-panel="login" role="tabpanel" aria-labelledby="loginTab" novalidate>
+                <label>
+                  <span data-i18n="account.email">Email</span>
+                  <input type="email" id="loginEmail" name="email" autocomplete="email" required />
+                </label>
+                <label>
+                  <span data-i18n="account.password">Password</span>
+                  <input type="password" id="loginPassword" name="password" autocomplete="current-password" required />
+                </label>
+                <button type="submit" data-i18n="account.login">Login</button>
+              </form>
+              <form class="auth-form" id="registerForm" data-auth-panel="register" role="tabpanel" aria-labelledby="registerTab" novalidate hidden>
+                <label>
+                  <span data-i18n="account.fullName">Full name</span>
+                  <input type="text" id="registerName" name="fullName" autocomplete="name" required />
+                </label>
+                <label>
+                  <span data-i18n="account.email">Email</span>
+                  <input type="email" id="registerEmail" name="email" autocomplete="email" required />
+                </label>
+                <label>
+                  <span data-i18n="account.password">Password</span>
+                  <input type="password" id="registerPassword" name="password" autocomplete="new-password" required />
+                </label>
+                <label>
+                  <span data-i18n="account.confirmPassword">Confirm password</span>
+                  <input type="password" id="registerConfirmPassword" name="confirmPassword" autocomplete="new-password" required />
+                </label>
+                <label>
+                  <span data-i18n="account.phone">Phone number</span>
+                  <input type="tel" id="registerPhone" name="phoneNumber" autocomplete="tel" maxlength="20" />
+                </label>
+                <button type="submit" data-i18n="account.createAccount">Create account</button>
+              </form>
+              <div class="auth-profile" id="authProfile" hidden>
+                <span data-i18n="account.signedInAs">Signed in as</span>
+                <strong id="authProfileName">Guest</strong>
+                <small id="authProfileEmail"></small>
+              </div>
+              <p class="form-status" id="authStatus" role="status" aria-live="polite"></p>
+              <button class="auth-logout" id="logoutButton" type="button" hidden data-i18n="account.logout">Logout</button>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -194,30 +275,77 @@
               <span>Lux</span>
               <em>Hotel</em>
             </a>
-            <p>Amelia Island, Panama</p>
+            <p data-i18n="footer.location">Amelia Island, Panama</p>
+            <p class="footer-note" data-i18n="footer.note">Southern charm, quiet scenery, and casually elegant surroundings near the bay.</p>
           </div>
           <div>
-            <strong>Contact</strong>
+            <strong data-i18n="footer.contact">Contact</strong>
+            <p>221 B, Baker Street, London</p>
             <a href="tel:+011877834245">+01 1 877 834 245</a>
             <a href="mailto:stay@luxhotel.example">stay@luxhotel.example</a>
           </div>
+          <nav aria-label="Footer navigation" data-i18n-aria="footer.navigation">
+            <strong data-i18n="footer.quickLinks">Quick links</strong>
+            <a href="#top" data-i18n="footer.home">Home</a>
+            <a href="#rooms" data-i18n="nav.rooms">Rooms</a>
+            <a href="#booking" data-i18n="footer.terms">Terms & Conditions</a>
+            <a href="#journal" data-i18n="footer.faq">FAQ</a>
+          </nav>
           <form id="sign-in-form" novalidate>
-            <strong>Stay in touch</strong>
+            <strong data-i18n="footer.newsletter">Don't miss any updates</strong>
             <div class="newsletter-row">
-              <input type="email" id="email" name="email" placeholder="Email address" />
-              <button type="submit">Sign up</button>
+              <input type="email" id="email" name="email" placeholder="Email address" data-i18n-placeholder="footer.emailPlaceholder" />
+              <button type="submit" data-i18n="footer.signUp">Sign up now</button>
             </div>
-            <small class="field-error" id="emailError">Enter your email.</small>
+            <small class="field-error" id="emailError" data-i18n="errors.emailRequired">Enter your email.</small>
           </form>
         </div>
+        <p class="footer-bottom" data-i18n="footer.bottom">&copy; Built with pride and care by ThemeBubble. All rights reserved.</p>
       </div>
-      <button id="go-to-top" type="button" aria-label="Go to top">↑</button>
+      <button id="go-to-top" type="button" aria-label="Go to top" data-i18n-aria="footer.goTop">↑</button>
     </footer>
+
+    <div class="room-modal" id="roomModal" role="dialog" aria-modal="true" aria-labelledby="roomModalTitle" aria-hidden="true">
+      <button class="modal-backdrop" type="button" data-close-room aria-label="Close room details" data-i18n-aria="modal.closeRoom"></button>
+      <article class="room-modal-card">
+        <button class="modal-close" type="button" data-close-room aria-label="Close room details" data-i18n="common.close" data-i18n-aria="modal.closeRoom">Close</button>
+        <div class="room-modal-media">
+          <img id="roomModalImage" src="./Images/Room - Standard.jpg" alt="" loading="lazy" decoding="async" />
+        </div>
+        <div class="room-modal-copy">
+          <p class="eyebrow dark" id="roomModalPrice">From $60 / night</p>
+          <h2 id="roomModalTitle">Standard Room</h2>
+          <p id="roomModalDescription"></p>
+          <div class="room-modal-stats" id="roomModalStats"></div>
+          <ul id="roomModalAmenities"></ul>
+          <a class="primary-btn" href="#booking" data-close-room data-i18n="modal.reserve">Reserve this stay</a>
+        </div>
+      </article>
+    </div>
+
+    <div class="lightbox" id="galleryLightbox" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle" aria-hidden="true">
+      <button class="lightbox-backdrop" type="button" data-close-gallery aria-label="Close gallery image" data-i18n-aria="modal.closeGallery"></button>
+      <figure class="lightbox-card">
+        <button class="modal-close" type="button" data-close-gallery aria-label="Close gallery image" data-i18n="common.close" data-i18n-aria="modal.closeGallery">Close</button>
+        <img id="lightboxImage" src="./Images/Slider 1.jpg" alt="" loading="lazy" decoding="async" />
+        <figcaption>
+          <span class="eyebrow dark" id="lightboxKicker">Gallery</span>
+          <strong id="lightboxTitle">Golden hour lounge</strong>
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-      onerror="this.remove()"
     ></script>
-    <script src="dom.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"
+    ></script>
+    <script src="dom.js?v=20260528-i18n-theme"></script>
   </body>
 </html>
