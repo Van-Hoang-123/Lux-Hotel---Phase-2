@@ -43,6 +43,32 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
   ? localStorage.getItem(languageStorageKey)
   : "en";
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isLowPowerDevice =
+  prefersReducedMotion ||
+  navigator.connection?.saveData ||
+  (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+  (navigator.deviceMemory && navigator.deviceMemory <= 4);
+document.documentElement.classList.toggle("low-power", Boolean(isLowPowerDevice));
+const apiContract = window.LuxApiContract || {
+  buildAvailabilityPayload: ({ arrivalDate, departureDate, adultCount, childCount }) => ({
+    arrivalDate,
+    departureDate,
+    adult: Number(adultCount),
+    children: Number(childCount),
+  }),
+  buildLegacyAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+    roomId: Number(roomId),
+    arrivalDate,
+    departureDate,
+    adults: Number(adultCount),
+    adult: Number(adultCount),
+    adultCount: Number(adultCount),
+    children: Number(childCount),
+    childCount: Number(childCount),
+  }),
+  readItems: (data) => (Array.isArray(data) ? data : data?.items || data?.Items || []),
+};
 
 const translations = {
   en: {
@@ -87,6 +113,9 @@ const translations = {
     "booking.checking": "Checking...",
     "booking.availableFallback": "Room is available.",
     "booking.unavailableFallback": "Room is not available.",
+    "booking.availableRooms": "{{count}} room is available for your stay.",
+    "booking.availableRooms_plural": "{{count}} rooms are available for your stay.",
+    "booking.noAvailableRooms": "No rooms are available for those dates and guests.",
     "booking.emptyResponse": "Availability checked, but the backend did not return details.",
     "booking.estimatedTotal": " Estimated total: {{total}}.",
     "booking.checkFailed": "Could not check availability.",
@@ -104,6 +133,7 @@ const translations = {
     "rooms.priceFrom": "From {{price}} / night",
     "rooms.viewDetails": "View details",
     "rooms.viewDetailsAria": "View {{room}} details",
+    "rooms.empty": "No rooms match this search yet. Try another date or guest count.",
     "experience.eyebrow": "Dining & Spa",
     "experience.book": "Book now",
     "amenities.eyebrow": "Vacation at ease",
@@ -214,6 +244,9 @@ const translations = {
     "booking.checking": "Đang kiểm tra...",
     "booking.availableFallback": "Phòng còn trống.",
     "booking.unavailableFallback": "Phòng không còn trống.",
+    "booking.availableRooms": "Có {{count}} phòng phù hợp cho kỳ nghỉ của bạn.",
+    "booking.availableRooms_plural": "Có {{count}} phòng phù hợp cho kỳ nghỉ của bạn.",
+    "booking.noAvailableRooms": "Không có phòng phù hợp với ngày và số khách đã chọn.",
     "booking.emptyResponse": "Đã kiểm tra phòng, nhưng backend chưa trả về chi tiết.",
     "booking.estimatedTotal": " Tổng dự kiến: {{total}}.",
     "booking.checkFailed": "Không kiểm tra được tình trạng phòng.",
@@ -231,6 +264,7 @@ const translations = {
     "rooms.priceFrom": "Từ {{price}} / đêm",
     "rooms.viewDetails": "Xem chi tiết",
     "rooms.viewDetailsAria": "Xem chi tiết {{room}}",
+    "rooms.empty": "Chưa có phòng phù hợp. Hãy thử ngày hoặc số khách khác.",
     "experience.eyebrow": "Ẩm thực & Spa",
     "experience.book": "Đặt ngay",
     "amenities.eyebrow": "Nghỉ dưỡng nhẹ nhàng",
@@ -564,6 +598,13 @@ function formatBookingResponse(data) {
     };
   }
 
+  if (Array.isArray(data)) {
+    return {
+      type: data.length ? "success" : "warning",
+      message: availableRoomsMessage(data.length),
+    };
+  }
+
   const isAvailable = readBoolean(data?.isAvailable ?? data?.IsAvailable ?? data?.available ?? data?.Available);
   const success = readBoolean(data?.success ?? data?.Success ?? data?.succeeded ?? data?.Succeeded);
   const isNegative = isAvailable === false || success === false;
@@ -656,6 +697,7 @@ const fallbackRooms = [
 ];
 
 let rooms = [...fallbackRooms];
+let allRooms = [...fallbackRooms];
 let selectedRoomId = rooms[0]?.id || 1;
 
 function findKnownRoom(room, title) {
@@ -664,15 +706,17 @@ function findKnownRoom(room, title) {
 }
 
 function normalizeRoom(room) {
-  const image = room.images?.[0]?.url || room.imageUrl || room.image;
-  const title = room.title || room.name || room.roomType || t("rooms.defaultTitle");
-  const nightlyPrice = room.nightlyPrice ?? room.pricePerNight ?? room.price;
-  const capacityAdults = Number(room.capacityAdults ?? room.capacity ?? 2);
-  const capacityChildren = Number(room.capacityChildren ?? 0);
+  const image = room.images?.[0]?.url || room.Images?.[0]?.Url || room.imageUrl || room.ImageUrl || room.image;
+  const title = room.title || room.Title || room.name || room.Name || room.roomType || room.RoomType || t("rooms.defaultTitle");
+  const nightlyPrice = room.nightlyPrice ?? room.NightlyPrice ?? room.pricePerNight ?? room.PricePerNight ?? room.price ?? room.Price;
   const priceValue = Number(nightlyPrice);
   const knownRoom = findKnownRoom(room, title);
+  const capacityAdults = Number(room.capacityAdults ?? room.CapacityAdults ?? room.capacity ?? room.Capacity ?? knownRoom?.capacityAdults ?? 2);
+  const capacityChildren = Number(room.capacityChildren ?? room.CapacityChildren ?? knownRoom?.capacityChildren ?? 0);
   const amenities = Array.isArray(room.amenities) && room.amenities.length
     ? room.amenities
+    : Array.isArray(room.Amenities) && room.Amenities.length
+    ? room.Amenities
     : ["King bed", "Rain shower", "Concierge care"];
 
   return {
@@ -685,10 +729,10 @@ function normalizeRoom(room) {
         ? t("rooms.priceFrom", { price: formatMoney(priceValue) })
         : nightlyPrice || t("rooms.priceFrom", { price: "$60" }),
     priceValue: Number.isFinite(priceValue) ? priceValue : null,
-    copy: room.description || room.copy || t("rooms.defaultCopy"),
+    copy: room.description || room.Description || room.copy || t("rooms.defaultCopy"),
     copyVi: knownRoom?.copyVi,
-    size: room.sizeSquareMeters ? `${room.sizeSquareMeters} m2` : room.size || "34 m2",
-    view: room.viewName || room.view || t("rooms.defaultView"),
+    size: room.sizeSquareMeters || room.SizeSquareMeters ? `${room.sizeSquareMeters || room.SizeSquareMeters} m2` : room.size || room.Size || "34 m2",
+    view: room.viewName || room.ViewName || room.view || room.View || t("rooms.defaultView"),
     viewVi: knownRoom?.viewVi,
     guests: formatGuests(capacityAdults, capacityChildren),
     capacityAdults,
@@ -810,6 +854,7 @@ const fallbackJournal = [
   {
     title: "Staying in Style Forever",
     titleVi: "Nghỉ Dưỡng Thanh Lịch",
+    slug: "staying-in-style-forever",
     image: "./Images/va0ymkiftpa-368x268.jpg",
     tag: "Lifestyle",
     tagVi: "Phong cách sống",
@@ -819,6 +864,7 @@ const fallbackJournal = [
   {
     title: "Electric Feel And Other Things",
     titleVi: "Cảm Hứng Từ Đảo",
+    slug: "electric-feel-and-other-things",
     image: "./Images/iStock_000002993908_Medium-1-1-368x268.jpg",
     tag: "Island",
     tagVi: "Hòn đảo",
@@ -828,6 +874,7 @@ const fallbackJournal = [
   {
     title: "Why Hotel Comfort Matters",
     titleVi: "Vì Sao Sự Thoải Mái Quan Trọng",
+    slug: "why-hotel-comfort-matters",
     image: "./Images/ihwo0unctps-368x268.jpg",
     tag: "Design",
     tagVi: "Thiết kế",
@@ -838,12 +885,37 @@ const fallbackJournal = [
 
 let journal = [...fallbackJournal];
 
+function journalKey(post) {
+  return String(post?.slug || post?.title || "").trim().toLowerCase();
+}
+
+function findKnownJournalPost(article, title) {
+  const slug = String(article.slug || article.Slug || "").trim().toLowerCase();
+  const normalizedTitle = String(title || "").trim().toLowerCase();
+  return fallbackJournal.find((post) => post.slug === slug || post.title.toLowerCase() === normalizedTitle);
+}
+
+function completeJournalPosts(posts) {
+  const seen = new Set(posts.map(journalKey).filter(Boolean));
+  const missingPosts = fallbackJournal.filter((post) => !seen.has(journalKey(post)));
+  return [...posts, ...missingPosts].slice(0, 3);
+}
+
 function normalizeArticle(article) {
+  const title = article.title || article.Title || t("journal.defaultTitle");
+  const knownPost = findKnownJournalPost(article, title);
+  const slug = article.slug || article.Slug || knownPost?.slug || "";
+  const category = article.category || article.Category || "";
+
   return {
-    title: article.title || t("journal.defaultTitle"),
-    image: localImagePath(article.coverImageUrl, "./Images/va0ymkiftpa-368x268.jpg"),
-    tag: article.slug ? article.slug.replaceAll("-", " ") : t("journal.defaultTag"),
-    copy: article.summary || article.content || t("journal.defaultCopy"),
+    title,
+    titleVi: knownPost?.titleVi,
+    slug,
+    image: localImagePath(article.coverImageUrl || article.CoverImageUrl, knownPost?.image || "./Images/va0ymkiftpa-368x268.jpg"),
+    tag: knownPost?.tag || category || (slug ? slug.replaceAll("-", " ") : t("journal.defaultTag")),
+    tagVi: knownPost?.tagVi,
+    copy: article.summary || article.Summary || article.content || article.Content || t("journal.defaultCopy"),
+    copyVi: knownPost?.copyVi,
   };
 }
 
@@ -889,6 +961,12 @@ function renderRoomOptions() {
   const select = $("#roomSelect");
   if (!select) return;
 
+  if (!rooms.length) {
+    selectedRoomId = 0;
+    select.innerHTML = `<option value="">${escapeHtml(t("rooms.empty"))}</option>`;
+    return;
+  }
+
   const hasSelected = rooms.some((room) => room.id === selectedRoomId);
   if (!hasSelected) selectedRoomId = rooms[0]?.id || 1;
 
@@ -905,6 +983,11 @@ function renderRoomOptions() {
 }
 
 function renderRooms() {
+  if (!rooms.length) {
+    $("#roomsGrid").innerHTML = `<p class="empty-state">${escapeHtml(t("rooms.empty"))}</p>`;
+    return;
+  }
+
   $("#roomsGrid").innerHTML = rooms
     .map((room, index) => {
       const title = roomTitle(room);
@@ -912,7 +995,7 @@ function renderRooms() {
         <article class="room-card">
           <button class="room-card-button" type="button" data-room-index="${index}" aria-label="${escapeHtml(t("rooms.viewDetailsAria", { room: title }))}">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
             </div>
             <div class="content">
               <p class="price">${escapeHtml(roomPrice(room))}</p>
@@ -944,13 +1027,40 @@ function renderAmenities() {
     .join("");
 }
 
+function resetRoomResults() {
+  if (rooms.length === allRooms.length && rooms.every((room, index) => room.id === allRooms[index]?.id)) return;
+  rooms = [...allRooms];
+  renderRoomOptions();
+  renderRooms();
+  window.ScrollTrigger?.refresh();
+}
+
+function availableRoomsMessage(count) {
+  if (count < 1) return t("booking.noAvailableRooms");
+  return t(count === 1 ? "booking.availableRooms" : "booking.availableRooms_plural", { count });
+}
+
+function applyAvailableRooms(apiRooms) {
+  const availableRooms = apiRooms.map(normalizeRoom).filter((room) => room.id > 0);
+  rooms = availableRooms;
+  selectedRoomId = availableRooms[0]?.id || 0;
+  renderRoomOptions();
+  renderRooms();
+  window.ScrollTrigger?.refresh();
+
+  return {
+    type: availableRooms.length ? "success" : "warning",
+    message: availableRoomsMessage(availableRooms.length),
+  };
+}
+
 function renderReviews() {
   $("#reviewsGrid").innerHTML = reviews
     .map(
       (review) => `
         <article class="review-card">
           <header>
-            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" />
+            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" fetchpriority="low" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
               <p>${escapeHtml(t("common.verifiedGuest"))}</p>
@@ -968,7 +1078,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" fetchpriority="low" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>
@@ -986,7 +1096,7 @@ function renderGallery() {
       const title = localized(item, "title");
       return `
         <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="${escapeHtml(t("gallery.openAria", { title }))}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" />
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
           <span>
             <small>${escapeHtml(localized(item, "kicker"))}</small>
             <strong>${escapeHtml(title)}</strong>
@@ -1001,12 +1111,34 @@ function setupLazyBackgrounds(root = document) {
   const cards = $$("[data-bg]", root);
   if (!cards.length) return;
 
+  const runWhenIdle = (callback) => {
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(callback, { timeout: 900 });
+      return;
+    }
+
+    window.setTimeout(callback, 80);
+  };
+
   const loadBackground = (card) => {
     const image = card.dataset.bg;
-    if (!image) return;
-    card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
-    card.classList.add("is-bg-loaded");
-    card.removeAttribute("data-bg");
+    if (!image || card.classList.contains("is-bg-loading")) return;
+
+    card.classList.add("is-bg-loading");
+    const loader = new Image();
+    loader.decoding = "async";
+    loader.onload = () => {
+      runWhenIdle(() => {
+        card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
+        card.classList.add("is-bg-loaded");
+        card.removeAttribute("data-bg");
+      });
+    };
+    loader.onerror = () => {
+      card.classList.remove("is-bg-loading");
+      card.removeAttribute("data-bg");
+    };
+    loader.src = image;
   };
 
   if (!("IntersectionObserver" in window)) {
@@ -1022,7 +1154,7 @@ function setupLazyBackgrounds(root = document) {
         observer.unobserve(entry.target);
       });
     },
-    { rootMargin: "240px 0px" }
+    { rootMargin: isLowPowerDevice ? "900px 0px" : "640px 0px" }
   );
 
   cards.forEach((card) => observer.observe(card));
@@ -1030,14 +1162,15 @@ function setupLazyBackgrounds(root = document) {
 
 async function fetchRooms() {
   try {
-    const response = await apiFetch("/rooms");
+    const response = await apiFetch("/rooms?sortBy=PricePerNight&order=Asc");
     if (!response.ok) throw new Error("Failed to fetch rooms");
 
     const data = await readJson(response);
-    const apiRooms = Array.isArray(data) ? data : data?.items || [];
+    const apiRooms = apiContract.readItems(data);
     if (!apiRooms.length) return;
 
-    rooms = apiRooms.map(normalizeRoom).filter((room) => room.id > 0);
+    allRooms = apiRooms.map(normalizeRoom).filter((room) => room.id > 0);
+    rooms = [...allRooms];
     renderRoomOptions();
     renderRooms();
     window.ScrollTrigger?.refresh();
@@ -1049,14 +1182,18 @@ async function fetchRooms() {
 
 async function fetchArticles() {
   try {
-    const response = await apiFetch("/articles");
+    const response = await apiFetchFirst([
+      "/articles/pagination?pageNumber=1&pageSize=3",
+      "/articles/getAll",
+      "/articles",
+    ]);
     if (!response.ok) throw new Error("Failed to fetch articles");
 
     const data = await readJson(response);
-    const articles = Array.isArray(data) ? data : data?.items || [];
+    const articles = apiContract.readItems(data);
     if (!articles.length) return;
 
-    journal = articles.map(normalizeArticle);
+    journal = completeJournalPosts(articles.map(normalizeArticle));
     renderJournal();
     window.ScrollTrigger?.refresh();
   } catch (error) {
@@ -1518,8 +1655,16 @@ function setupForms() {
     setBookingStatus("", "");
   });
 
-  $("#adult").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount));
-  $("#children").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount));
+  $("#arrivalDate").addEventListener("change", resetRoomResults);
+  $("#departureDate").addEventListener("change", resetRoomResults);
+  $("#adult").addEventListener("change", (event) => {
+    normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount);
+    resetRoomResults();
+  });
+  $("#children").addEventListener("change", (event) => {
+    normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount);
+    resetRoomResults();
+  });
 
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1530,7 +1675,7 @@ function setupForms() {
     const departure = $("#departureDate").value;
     const adultCount = readGuestCount("#adult");
     const childCount = readGuestCount("#children");
-    const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId, 10);
+    const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId || allRooms[0]?.id || 0, 10);
 
     setBookingStatus("", "");
     if (!validateBookingDates(arrival, departure)) return;
@@ -1540,31 +1685,46 @@ function setupForms() {
     submitButton.textContent = t("booking.checking");
 
     try {
-      const response = await apiFetch("/bookings/check-availability", {
+      let response = await apiFetch("/bookings/check-availability", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...authHeader(),
         },
-        body: JSON.stringify({
-          roomId,
+        body: JSON.stringify(apiContract.buildAvailabilityPayload({
           arrivalDate: arrival,
           departureDate: departure,
-          adults: adultCount,
-          adult: adultCount,
           adultCount,
-          children: childCount,
           childCount,
-        }),
+        })),
       });
 
-      const data = await readJson(response);
+      let data = await readJson(response);
+      if (!response.ok && roomId > 0) {
+        response = await apiFetch("/bookings/check-availability", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+          body: JSON.stringify(apiContract.buildLegacyAvailabilityPayload({
+            roomId,
+            arrivalDate: arrival,
+            departureDate: departure,
+            adultCount,
+            childCount,
+          })),
+        });
+        data = await readJson(response);
+      }
+
       if (!response.ok) {
         setBookingStatus("error", formatApiError(data, t("booking.checkFailed")));
         return;
       }
 
-      const result = formatBookingResponse(data);
+      const availableRooms = apiContract.readItems(data);
+      const result = Array.isArray(data) || availableRooms.length ? applyAvailableRooms(availableRooms) : formatBookingResponse(data);
       setBookingStatus(result.type, result.message);
     } catch (error) {
       console.error("Booking API error:", error);
@@ -1667,9 +1827,8 @@ function setupGalleryLightbox() {
 
 function setupMagneticButtons() {
   const gsap = window.gsap;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  if (!gsap || reducedMotion || coarsePointer) return;
+  if (!gsap || isLowPowerDevice || coarsePointer) return;
 
   const buttons = $$(
     ".primary-btn, .ghost-btn, .nav-cta, .language-switch button, .theme-toggle, .booking-form button, .newsletter-row button, .auth-tabs button, .auth-form button, .auth-logout, .experience-actions button, .hero-controls button"
@@ -1691,8 +1850,7 @@ function setupMagneticButtons() {
 
 function setupAnimations() {
   const gsap = window.gsap;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!gsap || reducedMotion) return;
+  if (!gsap || prefersReducedMotion) return;
 
   const scrollTrigger = window.ScrollTrigger;
   if (scrollTrigger) gsap.registerPlugin(scrollTrigger);
@@ -1718,6 +1876,7 @@ function setupAnimations() {
     .from(".hero-controls", { opacity: 0, duration: 0.45 }, "-=0.35");
 
   if (!scrollTrigger) return;
+  if (isLowPowerDevice) return;
 
   gsap.to(".hero-slide", {
     yPercent: 8,

@@ -102,6 +102,7 @@ a {
 img {
     max-width: 100%;
     display: block;
+    background: var(--sand);
 }
 
 button,
@@ -553,11 +554,31 @@ select {
     padding: 0 14px;
     background: var(--input-bg);
     color: var(--ink);
+    line-height: 1.2;
     outline: none;
 }
 
 input::placeholder {
     color: var(--input-placeholder);
+}
+
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 44px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position:
+        calc(100% - 20px) 50%,
+        calc(100% - 15px) 50%;
+    background-repeat: no-repeat;
+    background-size: 6px 6px, 6px 6px;
+}
+
+select option {
+    background: var(--input-bg);
+    color: var(--ink);
 }
 
 input:focus,
@@ -701,6 +722,17 @@ select:focus {
     padding: clamp(82px, 11vw, 142px) 0;
 }
 
+.intro-section,
+.rooms-section,
+.amenities-section,
+.gallery-section,
+.reviews-section,
+.journal-section,
+.account-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 760px;
+}
+
 .intro-grid {
     display: grid;
     grid-template-columns: 1fr minmax(260px, 380px) 1fr;
@@ -739,6 +771,10 @@ select:focus {
     margin-bottom: 36px;
 }
 
+.journal-section .section-heading {
+    max-width: 1080px;
+}
+
 .section-heading.center {
     margin-right: auto;
     margin-left: auto;
@@ -755,6 +791,18 @@ select:focus {
 
 .room-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 28px;
+    background: var(--card);
+    color: var(--muted);
+    font-weight: 800;
+    text-align: center;
 }
 
 .room-card,
@@ -817,6 +865,17 @@ select:focus {
     transition: transform 0.5s ease;
 }
 
+.room-media img,
+.journal-card img,
+.gallery-item img,
+.review-card img,
+.intro-grid img,
+.experience-section > img,
+.room-modal-media img,
+.lightbox-card img {
+    backface-visibility: hidden;
+}
+
 .room-card:hover .room-media img {
     transform: scale(1.15);
 }
@@ -863,7 +922,7 @@ select:focus {
 }
 
 .journal-card .content {
-    padding: 20px;
+    padding: 22px;
 }
 
 .room-card .content strong {
@@ -902,6 +961,12 @@ select:focus {
     margin-bottom: 8px;
     font-size: 25px;
     line-height: 1.1;
+}
+
+.journal-card h3 {
+    font-size: clamp(22px, 1.8vw, 24px);
+    line-height: 1.14;
+    overflow-wrap: normal;
 }
 
 .room-card p,
@@ -992,6 +1057,13 @@ select:focus {
     color: #fff;
     isolation: isolate;
     position: relative;
+    transition: background-color 0.24s ease, transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.amenity-card:not(.is-bg-loaded) {
+    background:
+        linear-gradient(135deg, rgba(185, 152, 103, 0.16), rgba(21, 17, 13, 0.9)),
+        var(--deep);
 }
 
 .amenity-card::before {
@@ -1093,6 +1165,7 @@ select:focus {
     width: 56px;
     height: 56px;
     border-radius: 50%;
+    object-fit: cover;
 }
 
 .review-card h3 {
@@ -1100,7 +1173,7 @@ select:focus {
 }
 
 .journal-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(260px, 1fr));
 }
 
 .journal-card .tag {
@@ -1317,10 +1390,19 @@ select:focus {
     width: 44px;
     height: 44px;
     border: 0;
-    border-radius: 50%;
-    background: var(--gold);
-    color: #fff;
-    box-shadow: rgba(23, 19, 15, 0.2) 0 14px 32px;
+    padding: 0;
+    background: transparent;
+    color: var(--gold);
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    font-size: 30px;
+    line-height: 1;
+    filter: drop-shadow(0 8px 14px rgba(23, 19, 15, 0.22));
+}
+
+#go-to-top span {
+    display: inline-block;
+    transform: rotate(-45deg);
+    transform-origin: center;
 }
 
 .room-modal,
@@ -1734,6 +1816,27 @@ select:focus {
     .lightbox-card figcaption {
         display: grid;
     }
+}
+
+.low-power .room-card:hover,
+.low-power .amenity-card:hover,
+.low-power .review-card:hover,
+.low-power .journal-card:hover,
+.low-power .gallery-item:hover {
+    transform: none;
+}
+
+.low-power .room-media img,
+.low-power .journal-card img,
+.low-power .gallery-item img {
+    transform: none;
+    transition: none;
+}
+
+.low-power .room-card:hover .room-media img,
+.low-power .journal-card:hover img,
+.low-power .gallery-item:hover img {
+    transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
