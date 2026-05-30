@@ -50,6 +50,25 @@ const isLowPowerDevice =
   (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
   (navigator.deviceMemory && navigator.deviceMemory <= 4);
 document.documentElement.classList.toggle("low-power", Boolean(isLowPowerDevice));
+const apiContract = window.LuxApiContract || {
+  buildAvailabilityPayload: ({ arrivalDate, departureDate, adultCount, childCount }) => ({
+    arrivalDate,
+    departureDate,
+    adult: Number(adultCount),
+    children: Number(childCount),
+  }),
+  buildLegacyAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+    roomId: Number(roomId),
+    arrivalDate,
+    departureDate,
+    adults: Number(adultCount),
+    adult: Number(adultCount),
+    adultCount: Number(adultCount),
+    children: Number(childCount),
+    childCount: Number(childCount),
+  }),
+  readItems: (data) => (Array.isArray(data) ? data : data?.items || data?.Items || []),
+};
 
 const translations = {
   en: {
@@ -94,6 +113,9 @@ const translations = {
     "booking.checking": "Checking...",
     "booking.availableFallback": "Room is available.",
     "booking.unavailableFallback": "Room is not available.",
+    "booking.availableRooms": "{{count}} room is available for your stay.",
+    "booking.availableRooms_plural": "{{count}} rooms are available for your stay.",
+    "booking.noAvailableRooms": "No rooms are available for those dates and guests.",
     "booking.emptyResponse": "Availability checked, but the backend did not return details.",
     "booking.estimatedTotal": " Estimated total: {{total}}.",
     "booking.checkFailed": "Could not check availability.",
@@ -111,6 +133,7 @@ const translations = {
     "rooms.priceFrom": "From {{price}} / night",
     "rooms.viewDetails": "View details",
     "rooms.viewDetailsAria": "View {{room}} details",
+    "rooms.empty": "No rooms match this search yet. Try another date or guest count.",
     "experience.eyebrow": "Dining & Spa",
     "experience.book": "Book now",
     "amenities.eyebrow": "Vacation at ease",
@@ -221,6 +244,9 @@ const translations = {
     "booking.checking": "Đang kiểm tra...",
     "booking.availableFallback": "Phòng còn trống.",
     "booking.unavailableFallback": "Phòng không còn trống.",
+    "booking.availableRooms": "Có {{count}} phòng phù hợp cho kỳ nghỉ của bạn.",
+    "booking.availableRooms_plural": "Có {{count}} phòng phù hợp cho kỳ nghỉ của bạn.",
+    "booking.noAvailableRooms": "Không có phòng phù hợp với ngày và số khách đã chọn.",
     "booking.emptyResponse": "Đã kiểm tra phòng, nhưng backend chưa trả về chi tiết.",
     "booking.estimatedTotal": " Tổng dự kiến: {{total}}.",
     "booking.checkFailed": "Không kiểm tra được tình trạng phòng.",
@@ -238,6 +264,7 @@ const translations = {
     "rooms.priceFrom": "Từ {{price}} / đêm",
     "rooms.viewDetails": "Xem chi tiết",
     "rooms.viewDetailsAria": "Xem chi tiết {{room}}",
+    "rooms.empty": "Chưa có phòng phù hợp. Hãy thử ngày hoặc số khách khác.",
     "experience.eyebrow": "Ẩm thực & Spa",
     "experience.book": "Đặt ngay",
     "amenities.eyebrow": "Nghỉ dưỡng nhẹ nhàng",
@@ -571,6 +598,13 @@ function formatBookingResponse(data) {
     };
   }
 
+  if (Array.isArray(data)) {
+    return {
+      type: data.length ? "success" : "warning",
+      message: availableRoomsMessage(data.length),
+    };
+  }
+
   const isAvailable = readBoolean(data?.isAvailable ?? data?.IsAvailable ?? data?.available ?? data?.Available);
   const success = readBoolean(data?.success ?? data?.Success ?? data?.succeeded ?? data?.Succeeded);
   const isNegative = isAvailable === false || success === false;
@@ -663,6 +697,7 @@ const fallbackRooms = [
 ];
 
 let rooms = [...fallbackRooms];
+let allRooms = [...fallbackRooms];
 let selectedRoomId = rooms[0]?.id || 1;
 
 function findKnownRoom(room, title) {
@@ -671,15 +706,17 @@ function findKnownRoom(room, title) {
 }
 
 function normalizeRoom(room) {
-  const image = room.images?.[0]?.url || room.imageUrl || room.image;
-  const title = room.title || room.name || room.roomType || t("rooms.defaultTitle");
-  const nightlyPrice = room.nightlyPrice ?? room.pricePerNight ?? room.price;
-  const capacityAdults = Number(room.capacityAdults ?? room.capacity ?? 2);
-  const capacityChildren = Number(room.capacityChildren ?? 0);
+  const image = room.images?.[0]?.url || room.Images?.[0]?.Url || room.imageUrl || room.ImageUrl || room.image;
+  const title = room.title || room.Title || room.name || room.Name || room.roomType || room.RoomType || t("rooms.defaultTitle");
+  const nightlyPrice = room.nightlyPrice ?? room.NightlyPrice ?? room.pricePerNight ?? room.PricePerNight ?? room.price ?? room.Price;
   const priceValue = Number(nightlyPrice);
   const knownRoom = findKnownRoom(room, title);
+  const capacityAdults = Number(room.capacityAdults ?? room.CapacityAdults ?? room.capacity ?? room.Capacity ?? knownRoom?.capacityAdults ?? 2);
+  const capacityChildren = Number(room.capacityChildren ?? room.CapacityChildren ?? knownRoom?.capacityChildren ?? 0);
   const amenities = Array.isArray(room.amenities) && room.amenities.length
     ? room.amenities
+    : Array.isArray(room.Amenities) && room.Amenities.length
+    ? room.Amenities
     : ["King bed", "Rain shower", "Concierge care"];
 
   return {
@@ -692,10 +729,10 @@ function normalizeRoom(room) {
         ? t("rooms.priceFrom", { price: formatMoney(priceValue) })
         : nightlyPrice || t("rooms.priceFrom", { price: "$60" }),
     priceValue: Number.isFinite(priceValue) ? priceValue : null,
-    copy: room.description || room.copy || t("rooms.defaultCopy"),
+    copy: room.description || room.Description || room.copy || t("rooms.defaultCopy"),
     copyVi: knownRoom?.copyVi,
-    size: room.sizeSquareMeters ? `${room.sizeSquareMeters} m2` : room.size || "34 m2",
-    view: room.viewName || room.view || t("rooms.defaultView"),
+    size: room.sizeSquareMeters || room.SizeSquareMeters ? `${room.sizeSquareMeters || room.SizeSquareMeters} m2` : room.size || room.Size || "34 m2",
+    view: room.viewName || room.ViewName || room.view || room.View || t("rooms.defaultView"),
     viewVi: knownRoom?.viewVi,
     guests: formatGuests(capacityAdults, capacityChildren),
     capacityAdults,
@@ -853,7 +890,7 @@ function journalKey(post) {
 }
 
 function findKnownJournalPost(article, title) {
-  const slug = String(article.slug || "").trim().toLowerCase();
+  const slug = String(article.slug || article.Slug || "").trim().toLowerCase();
   const normalizedTitle = String(title || "").trim().toLowerCase();
   return fallbackJournal.find((post) => post.slug === slug || post.title.toLowerCase() === normalizedTitle);
 }
@@ -865,17 +902,19 @@ function completeJournalPosts(posts) {
 }
 
 function normalizeArticle(article) {
-  const title = article.title || t("journal.defaultTitle");
+  const title = article.title || article.Title || t("journal.defaultTitle");
   const knownPost = findKnownJournalPost(article, title);
+  const slug = article.slug || article.Slug || knownPost?.slug || "";
+  const category = article.category || article.Category || "";
 
   return {
     title,
     titleVi: knownPost?.titleVi,
-    slug: article.slug || knownPost?.slug || "",
-    image: localImagePath(article.coverImageUrl, knownPost?.image || "./Images/va0ymkiftpa-368x268.jpg"),
-    tag: knownPost?.tag || (article.slug ? article.slug.replaceAll("-", " ") : t("journal.defaultTag")),
+    slug,
+    image: localImagePath(article.coverImageUrl || article.CoverImageUrl, knownPost?.image || "./Images/va0ymkiftpa-368x268.jpg"),
+    tag: knownPost?.tag || category || (slug ? slug.replaceAll("-", " ") : t("journal.defaultTag")),
     tagVi: knownPost?.tagVi,
-    copy: article.summary || article.content || t("journal.defaultCopy"),
+    copy: article.summary || article.Summary || article.content || article.Content || t("journal.defaultCopy"),
     copyVi: knownPost?.copyVi,
   };
 }
@@ -922,6 +961,12 @@ function renderRoomOptions() {
   const select = $("#roomSelect");
   if (!select) return;
 
+  if (!rooms.length) {
+    selectedRoomId = 0;
+    select.innerHTML = `<option value="">${escapeHtml(t("rooms.empty"))}</option>`;
+    return;
+  }
+
   const hasSelected = rooms.some((room) => room.id === selectedRoomId);
   if (!hasSelected) selectedRoomId = rooms[0]?.id || 1;
 
@@ -938,6 +983,11 @@ function renderRoomOptions() {
 }
 
 function renderRooms() {
+  if (!rooms.length) {
+    $("#roomsGrid").innerHTML = `<p class="empty-state">${escapeHtml(t("rooms.empty"))}</p>`;
+    return;
+  }
+
   $("#roomsGrid").innerHTML = rooms
     .map((room, index) => {
       const title = roomTitle(room);
@@ -975,6 +1025,33 @@ function renderAmenities() {
       `
     )
     .join("");
+}
+
+function resetRoomResults() {
+  if (rooms.length === allRooms.length && rooms.every((room, index) => room.id === allRooms[index]?.id)) return;
+  rooms = [...allRooms];
+  renderRoomOptions();
+  renderRooms();
+  window.ScrollTrigger?.refresh();
+}
+
+function availableRoomsMessage(count) {
+  if (count < 1) return t("booking.noAvailableRooms");
+  return t(count === 1 ? "booking.availableRooms" : "booking.availableRooms_plural", { count });
+}
+
+function applyAvailableRooms(apiRooms) {
+  const availableRooms = apiRooms.map(normalizeRoom).filter((room) => room.id > 0);
+  rooms = availableRooms;
+  selectedRoomId = availableRooms[0]?.id || 0;
+  renderRoomOptions();
+  renderRooms();
+  window.ScrollTrigger?.refresh();
+
+  return {
+    type: availableRooms.length ? "success" : "warning",
+    message: availableRoomsMessage(availableRooms.length),
+  };
 }
 
 function renderReviews() {
@@ -1085,14 +1162,15 @@ function setupLazyBackgrounds(root = document) {
 
 async function fetchRooms() {
   try {
-    const response = await apiFetch("/rooms");
+    const response = await apiFetch("/rooms?sortBy=PricePerNight&order=Asc");
     if (!response.ok) throw new Error("Failed to fetch rooms");
 
     const data = await readJson(response);
-    const apiRooms = Array.isArray(data) ? data : data?.items || [];
+    const apiRooms = apiContract.readItems(data);
     if (!apiRooms.length) return;
 
-    rooms = apiRooms.map(normalizeRoom).filter((room) => room.id > 0);
+    allRooms = apiRooms.map(normalizeRoom).filter((room) => room.id > 0);
+    rooms = [...allRooms];
     renderRoomOptions();
     renderRooms();
     window.ScrollTrigger?.refresh();
@@ -1104,11 +1182,15 @@ async function fetchRooms() {
 
 async function fetchArticles() {
   try {
-    const response = await apiFetch("/articles");
+    const response = await apiFetchFirst([
+      "/articles/pagination?pageNumber=1&pageSize=3",
+      "/articles/getAll",
+      "/articles",
+    ]);
     if (!response.ok) throw new Error("Failed to fetch articles");
 
     const data = await readJson(response);
-    const articles = Array.isArray(data) ? data : data?.items || [];
+    const articles = apiContract.readItems(data);
     if (!articles.length) return;
 
     journal = completeJournalPosts(articles.map(normalizeArticle));
@@ -1573,8 +1655,16 @@ function setupForms() {
     setBookingStatus("", "");
   });
 
-  $("#adult").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount));
-  $("#children").addEventListener("change", (event) => normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount));
+  $("#arrivalDate").addEventListener("change", resetRoomResults);
+  $("#departureDate").addEventListener("change", resetRoomResults);
+  $("#adult").addEventListener("change", (event) => {
+    normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount);
+    resetRoomResults();
+  });
+  $("#children").addEventListener("change", (event) => {
+    normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount);
+    resetRoomResults();
+  });
 
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1585,7 +1675,7 @@ function setupForms() {
     const departure = $("#departureDate").value;
     const adultCount = readGuestCount("#adult");
     const childCount = readGuestCount("#children");
-    const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId, 10);
+    const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId || allRooms[0]?.id || 0, 10);
 
     setBookingStatus("", "");
     if (!validateBookingDates(arrival, departure)) return;
@@ -1595,31 +1685,46 @@ function setupForms() {
     submitButton.textContent = t("booking.checking");
 
     try {
-      const response = await apiFetch("/bookings/check-availability", {
+      let response = await apiFetch("/bookings/check-availability", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...authHeader(),
         },
-        body: JSON.stringify({
-          roomId,
+        body: JSON.stringify(apiContract.buildAvailabilityPayload({
           arrivalDate: arrival,
           departureDate: departure,
-          adults: adultCount,
-          adult: adultCount,
           adultCount,
-          children: childCount,
           childCount,
-        }),
+        })),
       });
 
-      const data = await readJson(response);
+      let data = await readJson(response);
+      if (!response.ok && roomId > 0) {
+        response = await apiFetch("/bookings/check-availability", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+          body: JSON.stringify(apiContract.buildLegacyAvailabilityPayload({
+            roomId,
+            arrivalDate: arrival,
+            departureDate: departure,
+            adultCount,
+            childCount,
+          })),
+        });
+        data = await readJson(response);
+      }
+
       if (!response.ok) {
         setBookingStatus("error", formatApiError(data, t("booking.checkFailed")));
         return;
       }
 
-      const result = formatBookingResponse(data);
+      const availableRooms = apiContract.readItems(data);
+      const result = Array.isArray(data) || availableRooms.length ? applyAvailableRooms(availableRooms) : formatBookingResponse(data);
       setBookingStatus(result.type, result.message);
     } catch (error) {
       console.error("Booking API error:", error);

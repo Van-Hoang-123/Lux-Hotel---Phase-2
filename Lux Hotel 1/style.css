@@ -793,6 +793,18 @@ select:focus {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.empty-state {
+    grid-column: 1 / -1;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 28px;
+    background: var(--card);
+    color: var(--muted);
+    font-weight: 800;
+    text-align: center;
+}
+
 .room-card,
 .amenity-card,
 .review-card,
