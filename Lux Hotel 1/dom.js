@@ -1078,7 +1078,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="eager" decoding="async" fetchpriority="low" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>

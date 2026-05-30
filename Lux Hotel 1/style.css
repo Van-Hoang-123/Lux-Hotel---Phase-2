@@ -558,6 +558,11 @@ select {
     outline: none;
 }
 
+input[type="number"] {
+    appearance: none;
+    -webkit-appearance: none;
+}
+
 input::placeholder {
     color: var(--input-placeholder);
 }
@@ -727,7 +732,6 @@ select:focus {
 .amenities-section,
 .gallery-section,
 .reviews-section,
-.journal-section,
 .account-section {
     content-visibility: auto;
     contain-intrinsic-size: auto 760px;
@@ -1563,6 +1567,22 @@ select:focus {
     will-change: transform;
 }
 
+@media (max-width: 1240px) {
+    .booking-form {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .booking-form > div:first-child,
+    .booking-form button {
+        grid-column: 1 / -1;
+    }
+
+    .booking-form button {
+        justify-self: end;
+        width: min(260px, 100%);
+    }
+}
+
 @media (max-width: 1060px) {
     .booking-form {
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1607,6 +1627,11 @@ select:focus {
     .booking-form > div:first-child,
     .booking-form button {
         grid-column: 1 / -1;
+    }
+
+    .booking-form button {
+        justify-self: stretch;
+        width: 100%;
     }
 
     .room-grid,
