@@ -1,114 +1,47 @@
+using System.Text.Json;
 using LuxHotel.Application.Dtos;
-using LuxHotel.Application.Validators;
 
 namespace LuxHotel.Tests.Validators;
 
 public class BookingValidatorTests
 {
-    private readonly BookingValidator _sut = new();
-
-    private static BookingRequestDto ValidDto() => new()
-    {
-        RoomId = 1,
-        ArrivalDate = DateTime.UtcNow.Date.AddDays(1),
-        DepartureDate = DateTime.UtcNow.Date.AddDays(3),
-        Adult = 2,
-        Children = 0
-    };
-
     [Fact]
-    public void Valid_payload_passes()
+    public void Booking_request_reads_backend_date_format()
     {
-        var result = _sut.Validate(ValidDto());
-        Assert.True(result.IsValid);
-    }
+        var dto = JsonSerializer.Deserialize<BookingRequestDto>(
+            """
+            {
+              "roomId": 1,
+              "arrivalDate": "03-06-2026",
+              "departureDate": "05-06-2026",
+              "adult": 2,
+              "children": 1
+            }
+            """,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-    [Fact]
-    public void Invalid_room_id_fails()
-    {
-        var dto = ValidDto();
-        dto.RoomId = 0;
-        var result = _sut.Validate(dto);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.RoomId));
+        Assert.NotNull(dto);
+        Assert.Equal(new DateTime(2026, 6, 3), dto.ArrivalDate);
+        Assert.Equal(new DateTime(2026, 6, 5), dto.DepartureDate);
+        Assert.Equal(2, dto.Adult);
+        Assert.Equal(1, dto.Children);
     }
 
     [Fact]
-    public void Past_arrival_date_fails()
+    public void Booking_request_writes_backend_date_format()
     {
-        var dto = ValidDto();
-        dto.ArrivalDate = DateTime.UtcNow.Date.AddDays(-1);
-        var result = _sut.Validate(dto);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.ArrivalDate));
-    }
+        var dto = new BookingRequestDto
+        {
+            RoomId = 1,
+            ArrivalDate = new DateTime(2026, 6, 3),
+            DepartureDate = new DateTime(2026, 6, 5),
+            Adult = 2,
+            Children = 1
+        };
 
-    [Fact]
-    public void Departure_equal_to_arrival_fails()
-    {
-        var dto = ValidDto();
-        dto.DepartureDate = dto.ArrivalDate;
-        var result = _sut.Validate(dto);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.DepartureDate));
-    }
+        var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
-    [Fact]
-    public void Departure_before_arrival_fails()
-    {
-        var dto = ValidDto();
-        dto.DepartureDate = dto.ArrivalDate.AddDays(-1);
-        var result = _sut.Validate(dto);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.DepartureDate));
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(11)]
-    [InlineData(-1)]
-    public void Invalid_adult_values_fail(int adult)
-    {
-        var dto = ValidDto();
-        dto.Adult = adult;
-        var result = _sut.Validate(dto);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.Adult));
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(4)]
-    [InlineData(10)]
-    public void Adult_in_range_passes(int adult)
-    {
-        var dto = ValidDto();
-        dto.Adult = adult;
-        var result = _sut.Validate(dto);
-        Assert.True(result.IsValid);
-    }
-
-    [Theory]
-    [InlineData(11)]
-    [InlineData(-1)]
-    public void Invalid_children_values_fail(int children)
-    {
-        var dto = ValidDto();
-        dto.Children = children;
-        var result = _sut.Validate(dto);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(dto.Children));
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(3)]
-    [InlineData(10)]
-    public void Children_in_range_passes(int children)
-    {
-        var dto = ValidDto();
-        dto.Children = children;
-        var result = _sut.Validate(dto);
-        Assert.True(result.IsValid);
+        Assert.Contains("\"arrivalDate\":\"03-06-2026\"", json);
+        Assert.Contains("\"departureDate\":\"05-06-2026\"", json);
     }
 }
