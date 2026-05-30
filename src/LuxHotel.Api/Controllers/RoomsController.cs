@@ -1,5 +1,6 @@
 using LuxHotel.Application.Dtos;
 using LuxHotel.Domain.Entities;
+using LuxHotel.Domain.Enums;
 using LuxHotel.Domain.Interfaces;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -20,10 +21,11 @@ namespace LuxHotel.Api.Controllers
         }
 
         // GET /api/rooms
+        // GET /api/rooms?sortBy=pricePerNight&descending=true
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetRoomsQueryDto query)
         {
-            var rooms = await _context.GetAllAsync();
+            var rooms = await _context.GetAllAsync(query.SortBy, query.Order);
             var result = rooms.Select(r => new RoomDto
             {
                 Id = r.Id,
@@ -31,7 +33,8 @@ namespace LuxHotel.Api.Controllers
                 PricePerNight = r.PricePerNight,
                 ImageUrl = r.ImageUrl,
                 Description = r.Description,
-                IsAvailable = r.IsAvailable
+                IsAvailable = r.IsAvailable,
+                Capacity = r.Capacity
             });
             return Ok(result);
         }
@@ -51,7 +54,8 @@ namespace LuxHotel.Api.Controllers
                 PricePerNight = room.PricePerNight,
                 ImageUrl = room.ImageUrl,
                 Description = room.Description,
-                IsAvailable = room.IsAvailable
+                IsAvailable = room.IsAvailable,
+                Capacity = room.Capacity
             });
         }
 
@@ -66,7 +70,8 @@ namespace LuxHotel.Api.Controllers
                 PricePerNight = dto.PricePerNight,
                 ImageUrl = dto.ImageUrl,
                 Description = dto.Description,
-                IsAvailable = true
+                IsAvailable = true,
+                Capacity = dto.Capacity
             };
             var created = await _context.CreateAsync(room);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
@@ -83,7 +88,8 @@ namespace LuxHotel.Api.Controllers
                 PricePerNight = dto.PricePerNight,
                 ImageUrl = dto.ImageUrl,
                 Description = dto.Description,
-                IsAvailable = dto.IsAvailable
+                IsAvailable = dto.IsAvailable,
+                Capacity = dto.Capacity
             };
             var updated = await _context.UpdateAsync(id, room);
             if (updated is null)

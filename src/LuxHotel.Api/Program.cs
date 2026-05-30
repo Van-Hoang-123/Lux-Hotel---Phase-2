@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,9 +70,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("UserOnly", p => p.RequireRole("User"));
 });
 
-builder.Services.AddValidatorsFromAssemblyContaining<BookingValidator>();
+//builder.Services.AddValidatorsFromAssemblyContaining<BookingValidator>(); * REMOVED BY QuangTu
+builder.Services.AddValidatorsFromAssemblyContaining<RoomValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
+
 
 builder.Services.AddAntiforgery(options =>
 {
@@ -83,7 +86,11 @@ builder.Services.AddAntiforgery(options =>
 });
 
 builder.Services.AddOpenApi();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
