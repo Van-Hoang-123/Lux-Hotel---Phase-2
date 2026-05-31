@@ -110,6 +110,9 @@ const translations = {
     "booking.children": "Children",
     "booking.search": "Search rooms",
     "booking.chooseRoom": "Choose room",
+    "booking.arrivalDate": "Arrival date",
+    "booking.departureDate": "Departure date",
+    "booking.selectDate": "Select date",
     "booking.checking": "Checking...",
     "booking.availableFallback": "Room is available.",
     "booking.unavailableFallback": "Room is not available.",
@@ -241,6 +244,9 @@ const translations = {
     "booking.children": "Trẻ em",
     "booking.search": "Tìm phòng",
     "booking.chooseRoom": "Chọn phòng",
+    "booking.arrivalDate": "Ngày đến",
+    "booking.departureDate": "Ngày đi",
+    "booking.selectDate": "Chọn ngày",
     "booking.checking": "Đang kiểm tra...",
     "booking.availableFallback": "Phòng còn trống.",
     "booking.unavailableFallback": "Phòng không còn trống.",
@@ -1078,7 +1084,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="lazy" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="eager" decoding="async" fetchpriority="low" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>
@@ -1246,6 +1252,7 @@ function applyStaticTranslations() {
 
   updateLanguageButtons();
   updateThemeButton();
+  updateDateDisplays();
   updateAccountSummary();
 }
 
@@ -1514,6 +1521,36 @@ function toDateInputValue(date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatBookingDate(value) {
+  if (!value) return "";
+
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+
+  if (currentLanguage === "vi") {
+    return `${day}/${month}/${year}`;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  const monthLabel = new Intl.DateTimeFormat("en", { month: "short" }).format(date);
+  return `${day}-${monthLabel}-${year}`;
+}
+
+function updateDateDisplay(input) {
+  if (!input) return;
+
+  const display = $(`[data-date-display-for="${input.id}"]`);
+  if (!display) return;
+
+  const hasValue = Boolean(input.value);
+  display.textContent = hasValue ? formatBookingDate(input.value) : t("booking.selectDate");
+  display.classList.toggle("is-placeholder", !hasValue);
+}
+
+function updateDateDisplays() {
+  $$("input[type='date']").forEach(updateDateDisplay);
+}
+
 function addDays(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -1537,8 +1574,11 @@ function setupDateBounds() {
     departure.min = toDateInputValue(nextDay);
     if (departure.value && departure.value <= arrival.value) {
       departure.value = "";
+      updateDateDisplay(departure);
     }
   });
+
+  updateDateDisplays();
 }
 
 function switchAuthPanel(mode) {
@@ -1655,8 +1695,12 @@ function setupForms() {
     setBookingStatus("", "");
   });
 
-  $("#arrivalDate").addEventListener("change", resetRoomResults);
-  $("#departureDate").addEventListener("change", resetRoomResults);
+  ["#arrivalDate", "#departureDate"].forEach((selector) => {
+    $(selector).addEventListener("change", (event) => {
+      updateDateDisplay(event.currentTarget);
+      resetRoomResults();
+    });
+  });
   $("#adult").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount);
     resetRoomResults();
