@@ -25,3 +25,12 @@ test("date inputs use a stable display layer instead of native date text", () =>
   assert.match(css, /\.date-control input\[type="date"\][\s\S]*opacity: 0;/);
   assert.match(dom, /function updateDateDisplay\(input\)/);
 });
+
+test("frontend exposes the user booking controller actions", () => {
+  assert.match(html, /id="bookRoomButton"[\s\S]*data-i18n="booking\.bookSelected"/);
+  assert.match(html, /id="bookingHistory"[\s\S]*id="bookingList"/);
+  assert.match(dom, /apiFetch\("\/bookings"/);
+  assert.match(dom, /apiFetch\("\/bookings\/my"/);
+  assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/cancel/);
+  assert.match(dom, /buildBookingPayload/);
+});

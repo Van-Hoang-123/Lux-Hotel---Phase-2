@@ -446,6 +446,31 @@ h1 {
     white-space: nowrap;
 }
 
+.booking-actions {
+    display: grid;
+    gap: 8px;
+    align-self: end;
+}
+
+.booking-actions button {
+    width: 100%;
+    min-width: 0;
+}
+
+.booking-actions .booking-secondary {
+    border-color: var(--line);
+    background: var(--input-bg);
+    color: var(--ink);
+    box-shadow: none;
+}
+
+.booking-actions .booking-secondary:hover {
+    border-color: var(--gold);
+    background: var(--card);
+    color: var(--gold-dark);
+    box-shadow: rgba(185, 152, 103, 0.14) 0 12px 26px;
+}
+
 .auth-form button {
     width: 100%;
 }
@@ -1383,6 +1408,135 @@ select:focus {
     overflow-wrap: anywhere;
 }
 
+.booking-history {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+}
+
+.booking-history[hidden] {
+    display: none;
+}
+
+.booking-history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.booking-history-head div {
+    display: grid;
+    gap: 2px;
+}
+
+.booking-history-head span,
+.booking-item-kicker,
+.booking-item-status {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.booking-history-head strong {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 24px;
+    line-height: 1.05;
+}
+
+.booking-history-head button,
+.booking-item-actions button {
+    min-height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0 14px;
+    background: var(--input-bg);
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.booking-list {
+    display: grid;
+}
+
+.booking-item {
+    display: grid;
+    gap: 10px;
+    border-top: 1px solid var(--line);
+    padding: 16px 0;
+}
+
+.booking-item:first-child {
+    border-top: 0;
+    padding-top: 4px;
+}
+
+.booking-item-header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.booking-item h3 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 24px;
+    line-height: 1.1;
+}
+
+.booking-item-status {
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: var(--input-bg);
+}
+
+.booking-item-status.is-confirmed {
+    border-color: var(--success-line);
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.booking-item-status.is-cancelled {
+    border-color: var(--error-line);
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+.booking-item-status.is-checkedout {
+    border-color: var(--warning-line);
+    background: var(--warning-bg);
+    color: var(--warning-text);
+}
+
+.booking-item p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.booking-item-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.booking-item-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+}
+
 .auth-shell .form-status {
     margin-top: 14px;
 }
@@ -1658,13 +1812,14 @@ select:focus {
     }
 
     .booking-form > div:first-child,
-    .booking-form button {
+    .booking-actions {
         grid-column: 1 / -1;
     }
 
-    .booking-form button {
+    .booking-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         justify-self: end;
-        width: min(260px, 100%);
+        width: min(440px, 100%);
     }
 }
 
@@ -1674,7 +1829,7 @@ select:focus {
     }
 
     .booking-form > div:first-child,
-    .booking-form button {
+    .booking-actions {
         grid-column: 1 / -1;
     }
 }
@@ -1710,11 +1865,11 @@ select:focus {
     }
 
     .booking-form > div:first-child,
-    .booking-form button {
+    .booking-actions {
         grid-column: 1 / -1;
     }
 
-    .booking-form button {
+    .booking-actions {
         justify-self: stretch;
         width: 100%;
     }
@@ -1882,6 +2037,14 @@ select:focus {
     .amenity-grid,
     .gallery-grid {
         grid-template-columns: 1fr;
+    }
+
+    .booking-actions,
+    .booking-history-head,
+    .booking-item-header {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .room-card {
