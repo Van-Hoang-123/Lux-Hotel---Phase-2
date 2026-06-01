@@ -34,6 +34,8 @@ test("frontend exposes the user booking controller actions", () => {
   assert.match(dom, /apiFetch\("\/bookings"/);
   assert.match(dom, /apiFetch\("\/bookings\/my"/);
   assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/cancel/);
+  assert.match(dom, /method: "DELETE"[\s\S]*returnStatuses: \[400, 401, 403, 404, 405\]/);
+  assert.match(dom, /function canCancelBooking\(booking\)[\s\S]*booking\.status === "Confirmed"/);
   assert.match(dom, /buildBookingPayload/);
   assert.match(dom, /getBookingGuest/);
   assert.match(dom, /guestFullName/);

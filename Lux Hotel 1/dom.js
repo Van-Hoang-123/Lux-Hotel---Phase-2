@@ -1282,12 +1282,7 @@ function bookingStatusClass(status = "") {
 }
 
 function canCancelBooking(booking) {
-  if (booking.status !== "Confirmed") return false;
-  if (!booking.arrivalDate) return true;
-  const arrival = new Date(`${booking.arrivalDate}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return arrival > today;
+  return booking.status === "Confirmed";
 }
 
 function canCompletePayment(booking) {
@@ -1405,6 +1400,7 @@ async function cancelBooking(bookingId, button) {
   try {
     let response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
       method: "PATCH",
+      returnStatuses: [400, 401, 403, 404, 405],
       headers: {
         ...authHeader(),
       },
@@ -1414,6 +1410,7 @@ async function cancelBooking(bookingId, button) {
     if (!response.ok && [404, 405].includes(response.status)) {
       response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}`, {
         method: "DELETE",
+        returnStatuses: [400, 401, 403, 404, 405],
         headers: {
           ...authHeader(),
         },
