@@ -1557,6 +1557,16 @@ select:focus {
     opacity: 0.58;
 }
 
+.booking-item-actions .payment-action {
+    border-color: transparent;
+    background: var(--gold);
+    color: #fffdf8;
+}
+
+.booking-item-actions .payment-action:hover {
+    background: var(--gold-dark);
+}
+
 .auth-shell .form-status {
     margin-top: 14px;
 }

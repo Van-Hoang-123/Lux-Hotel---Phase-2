@@ -34,8 +34,22 @@ test("frontend exposes the user booking controller actions", () => {
   assert.match(dom, /apiFetch\("\/bookings"/);
   assert.match(dom, /apiFetch\("\/bookings\/my"/);
   assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/cancel/);
+  assert.match(dom, /method: "DELETE"[\s\S]*returnStatuses: \[400, 401, 403, 404, 405\]/);
+  assert.match(dom, /function canCancelBooking\(booking\)[\s\S]*booking\.status === "Confirmed"/);
   assert.match(dom, /buildBookingPayload/);
   assert.match(dom, /getBookingGuest/);
   assert.match(dom, /guestFullName/);
   assert.match(dom, /guestEmail/);
+});
+
+test("frontend exposes the payment completion action from the booking controller", () => {
+  assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/complete-payment/);
+  assert.match(dom, /data-complete-payment/);
+  assert.match(dom, /account\.paymentUnavailable/);
+  assert.match(dom, /paymentApiAvailable/);
+  assert.match(dom, /userHasRole\(getStoredAuth\(\), "Admin"\)/);
+  assert.match(dom, /\["Confirmed", "Pending"\]\.includes\(booking\.status\)/);
+  assert.match(dom, /const bookingPath = userHasRole\(auth, "Admin"\) \? "\/bookings" : "\/bookings\/my"/);
+  assert.match(dom, /returnStatuses: \[400, 401, 403, 404, 405\]/);
+  assert.match(css, /\.booking-item-actions \.payment-action/);
 });

@@ -43,6 +43,8 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
   ? localStorage.getItem(languageStorageKey)
   : "en";
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
+let paymentApiAvailable = true;
+let paymentApiProbeStarted = false;
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
   prefersReducedMotion ||
@@ -236,6 +238,16 @@ const translations = {
     "account.canceling": "Canceling...",
     "account.cancelled": "Booking cancelled.",
     "account.bookingCancelFailed": "Could not cancel this booking.",
+    "account.completePayment": "Complete payment",
+    "account.completingPayment": "Completing...",
+    "account.paymentCompleted": "Payment completed.",
+    "account.paymentFailed": "Could not complete this payment.",
+    "account.paymentUnavailable": "Payment API is not available on this backend yet.",
+    "account.paymentForbidden": "This account cannot complete payments on the backend.",
+    "account.paymentIdMismatch": "Payment API does not match the current booking ID format.",
+    "account.paymentStatus": "Payment: {{status}}",
+    "account.paymentPending": "Pending",
+    "account.paymentCompletedStatus": "Completed",
     "account.bookingDates": "{{arrival}} to {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Total: {{total}}",
@@ -390,6 +402,16 @@ const translations = {
     "account.canceling": "Đang hủy...",
     "account.cancelled": "Đã hủy booking.",
     "account.bookingCancelFailed": "Không hủy được booking này.",
+    "account.completePayment": "Hoàn tất thanh toán",
+    "account.completingPayment": "Đang xử lý...",
+    "account.paymentCompleted": "Đã hoàn tất thanh toán.",
+    "account.paymentFailed": "Không hoàn tất được thanh toán này.",
+    "account.paymentUnavailable": "Backend hiện chưa có Payment API.",
+    "account.paymentForbidden": "Tài khoản này chưa được backend cho phép hoàn tất thanh toán.",
+    "account.paymentIdMismatch": "Payment API chưa khớp kiểu mã booking hiện tại.",
+    "account.paymentStatus": "Thanh toán: {{status}}",
+    "account.paymentPending": "Chờ thanh toán",
+    "account.paymentCompletedStatus": "Đã thanh toán",
     "account.bookingDates": "{{arrival}} đến {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Tổng: {{total}}",
@@ -422,14 +444,16 @@ const translations = {
 };
 
 async function apiFetch(path, options = {}) {
+  const { returnStatuses = [], ...fetchOptions } = options;
+  const statusesToReturn = new Set(returnStatuses);
   const orderedCandidates = [...new Set([apiBaseUrl, ...apiCandidates])];
   let lastError;
 
   for (const baseUrl of orderedCandidates) {
     try {
-      const response = await fetch(`${baseUrl}${path}`, options);
+      const response = await fetch(`${baseUrl}${path}`, fetchOptions);
 
-      if (response.ok) {
+      if (response.ok || statusesToReturn.has(response.status)) {
         apiBaseUrl = baseUrl;
         return response;
       }
@@ -535,6 +559,10 @@ function authHeader() {
   return auth?.token ? { Authorization: `Bearer ${auth.token}` } : {};
 }
 
+function apiRootFromBase(baseUrl) {
+  return normalizeApiBase(baseUrl).replace(/\/api$/i, "");
+}
+
 function getStoredAuth() {
   try {
     return JSON.parse(localStorage.getItem(authStorageKey) || "null");
@@ -565,7 +593,7 @@ function normalizeAuthUser(user = {}, token = "") {
   const emailClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
   const idClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
   const roleClaim = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
-  const roles = user.roles || user.Roles || claims.roles || claims.Roles || claims.role || claims[roleClaim] || [];
+  const roles = user.roles || user.Roles || user.role || user.Role || claims.roles || claims.Roles || claims.role || claims[roleClaim] || [];
 
   return {
     id: firstValue(user.id, user.Id, claims.sub, claims.nameid, claims[idClaim]),
@@ -617,11 +645,42 @@ function getDisplayName(user = {}) {
   return user.fullName || user.email || t("account.guest");
 }
 
+function userHasRole(auth, roleName) {
+  const target = String(roleName || "").toLowerCase();
+  const roles = auth?.user?.roles || [];
+  return roles.some((role) => String(role).toLowerCase() === target);
+}
+
 function getBookingGuest(auth = getStoredAuth()) {
   const user = auth?.user || {};
   const guestEmail = firstValue(user.email, user.Email);
   const guestFullName = firstValue(user.fullName, user.FullName, user.name, user.Name, guestEmail);
   return { guestFullName, guestEmail };
+}
+
+async function detectPaymentApiSupport() {
+  if (paymentApiProbeStarted) return paymentApiAvailable;
+  paymentApiProbeStarted = true;
+
+  const roots = [...new Set([apiBaseUrl, ...apiCandidates].map(apiRootFromBase).filter(Boolean))];
+  for (const root of roots) {
+    try {
+      const response = await fetch(`${root}/swagger/v1/swagger.json`);
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const paths = Object.keys(data?.paths || {}).map((path) => path.toLowerCase());
+      paymentApiAvailable = paths.some((path) => path.includes("complete-payment") || path.includes("payment"));
+      renderBookingHistory();
+      return paymentApiAvailable;
+    } catch {
+      // Swagger is optional; if it is unavailable, keep payment actions hidden.
+    }
+  }
+
+  paymentApiAvailable = false;
+  renderBookingHistory();
+  return paymentApiAvailable;
 }
 
 async function refreshAuthProfile(auth) {
@@ -1175,6 +1234,7 @@ function normalizeBookingStatus(value) {
     "1": "Confirmed",
     "2": "Cancelled",
     "3": "CheckedOut",
+    pending: "Pending",
     confirmed: "Confirmed",
     cancelled: "Cancelled",
     checkedout: "CheckedOut",
@@ -1183,7 +1243,26 @@ function normalizeBookingStatus(value) {
   return statusMap[raw.toLowerCase()] || raw;
 }
 
+function normalizePaymentStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const statusMap = {
+    "1": t("account.paymentPending"),
+    "2": t("account.paymentCompletedStatus"),
+    pending: t("account.paymentPending"),
+    completed: t("account.paymentCompletedStatus"),
+    paid: t("account.paymentCompletedStatus"),
+  };
+  return statusMap[raw.toLowerCase()] || raw;
+}
+
+function isPaymentCompleted(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return ["2", "completed", "paid"].includes(raw);
+}
+
 function normalizeBooking(booking = {}) {
+  const payment = booking.payment || booking.Payment || {};
   return {
     id: String(booking.id || booking.Id || ""),
     roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
@@ -1194,6 +1273,8 @@ function normalizeBooking(booking = {}) {
     children: Number(booking.childCount ?? booking.ChildCount ?? booking.children ?? booking.Children ?? 0),
     totalPrice: Number(booking.totalPrice ?? booking.TotalPrice ?? 0),
     status: normalizeBookingStatus(booking.bookingStatus ?? booking.BookingStatus ?? booking.status ?? booking.Status),
+    paymentStatus: booking.paymentStatus ?? booking.PaymentStatus ?? payment.paymentStatus ?? payment.PaymentStatus ?? "",
+    paidAt: booking.paidAt ?? booking.PaidAt ?? payment.paidAt ?? payment.PaidAt ?? "",
   };
 }
 
@@ -1202,12 +1283,16 @@ function bookingStatusClass(status = "") {
 }
 
 function canCancelBooking(booking) {
-  if (booking.status !== "Confirmed") return false;
-  if (!booking.arrivalDate) return true;
-  const arrival = new Date(`${booking.arrivalDate}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return arrival > today;
+  return booking.status === "Confirmed";
+}
+
+function canCompletePayment(booking) {
+  return (
+    userHasRole(getStoredAuth(), "Admin") &&
+    Boolean(booking.id) &&
+    ["Confirmed", "Pending"].includes(booking.status) &&
+    !isPaymentCompleted(booking.paymentStatus)
+  );
 }
 
 function renderBookingHistory(message = "") {
@@ -1238,6 +1323,13 @@ function renderBookingHistory(message = "") {
       const roomName = booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
       const status = booking.status || "Pending";
       const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
+      const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+      const paymentStatusMarkup = paymentStatus
+        ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
+        : "";
+      const paymentActionMarkup = canCompletePayment(booking)
+        ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
+        : "";
       return `
         <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
           <div class="booking-item-header">
@@ -1252,7 +1344,9 @@ function renderBookingHistory(message = "") {
           </div>
           <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
           <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
+          ${paymentStatusMarkup}
           <div class="booking-item-actions">
+            ${paymentActionMarkup}
             <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
           </div>
         </article>
@@ -1272,12 +1366,23 @@ async function fetchMyBookings({ silent = false } = {}) {
   if (!silent) renderBookingHistory(t("account.loadingBookings"));
 
   try {
-    const response = await apiFetch("/bookings/my", {
+    const bookingPath = userHasRole(auth, "Admin") ? "/bookings" : "/bookings/my";
+    let response = await apiFetch(bookingPath, {
       headers: {
         ...authHeader(),
       },
+      returnStatuses: [404, 405],
     });
-    const data = await readJson(response);
+    let data = await readJson(response);
+
+    if (!response.ok && [404, 405].includes(response.status) && bookingPath !== "/bookings/my") {
+      response = await apiFetch("/bookings/my", {
+        headers: {
+          ...authHeader(),
+        },
+      });
+      data = await readJson(response);
+    }
 
     if (!response.ok) {
       myBookings = [];
@@ -1306,6 +1411,7 @@ async function cancelBooking(bookingId, button) {
   try {
     let response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
       method: "PATCH",
+      returnStatuses: [400, 401, 403, 404, 405],
       headers: {
         ...authHeader(),
       },
@@ -1315,6 +1421,7 @@ async function cancelBooking(bookingId, button) {
     if (!response.ok && [404, 405].includes(response.status)) {
       response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}`, {
         method: "DELETE",
+        returnStatuses: [400, 401, 403, 404, 405],
         headers: {
           ...authHeader(),
         },
@@ -1335,6 +1442,64 @@ async function cancelBooking(bookingId, button) {
   } finally {
     button.disabled = false;
     button.textContent = t("account.cancelBooking");
+  }
+}
+
+async function completePayment(bookingId, button) {
+  if (!bookingId || !button) return;
+
+  button.disabled = true;
+  button.textContent = t("account.completingPayment");
+
+  try {
+    const response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/complete-payment`, {
+      method: "PATCH",
+      returnStatuses: [400, 401, 403, 404, 405],
+      headers: {
+        ...authHeader(),
+      },
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      if ([404, 405].includes(response.status)) {
+        paymentApiAvailable = false;
+        renderBookingHistory();
+        showToast("warning", t("account.paymentUnavailable"));
+        return;
+      }
+      if ([401, 403].includes(response.status)) {
+        showToast("warning", t("account.paymentForbidden"));
+        return;
+      }
+
+      const message = formatApiError(data, "").toLowerCase();
+      if (response.status === 400 && (message.includes("not valid") || message.includes("guid") || message.includes("id"))) {
+        showToast("warning", t("account.paymentIdMismatch"));
+        return;
+      }
+
+      showToast("error", formatApiError(data, t("account.paymentFailed")));
+      return;
+    }
+
+    const paymentStatus = data?.paymentStatus || data?.PaymentStatus || "Completed";
+    const paidAt = data?.paidAt || data?.PaidAt || new Date().toISOString();
+    myBookings = myBookings.map((booking) =>
+      booking.id === String(bookingId)
+        ? { ...booking, paymentStatus, paidAt }
+        : booking
+    );
+    renderBookingHistory();
+    showToast("success", data?.message || data?.Message || t("account.paymentCompleted"));
+  } catch (error) {
+    console.error("Complete payment API error:", error);
+    showToast("error", t("account.paymentFailed"));
+  } finally {
+    if (button.isConnected) {
+      button.disabled = false;
+      button.textContent = t("account.completePayment");
+    }
   }
 }
 
@@ -1979,6 +2144,7 @@ function setupAuthForms() {
   refreshAuthProfile(getStoredAuth()).then((auth) => {
     updateAccountSummary(auth);
     fetchMyBookings({ silent: true });
+    detectPaymentApiSupport();
   });
 
   $$("[data-auth-tab]").forEach((button) => {
@@ -2006,9 +2172,15 @@ function setupAuthForms() {
 
   $("#refreshBookings")?.addEventListener("click", () => fetchMyBookings());
   $("#bookingList")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-cancel-booking]");
-    if (!button) return;
-    cancelBooking(button.dataset.cancelBooking, button);
+    const paymentButton = event.target.closest("[data-complete-payment]");
+    if (paymentButton) {
+      completePayment(paymentButton.dataset.completePayment, paymentButton);
+      return;
+    }
+
+    const cancelButton = event.target.closest("[data-cancel-booking]");
+    if (!cancelButton) return;
+    cancelBooking(cancelButton.dataset.cancelBooking, cancelButton);
   });
 }
 
