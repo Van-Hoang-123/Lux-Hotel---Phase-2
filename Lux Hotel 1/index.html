@@ -18,7 +18,7 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260531-date-control" />
+    <link rel="stylesheet" href="style.css?v=20260601-booking-api" />
   </head>
   <body>
     <header class="site-header" id="top">
@@ -117,7 +117,10 @@
             <span data-i18n="booking.children">Children</span>
             <input type="number" id="children" name="childCount" min="0" max="20" step="1" value="0" inputmode="numeric" />
           </label>
-          <button type="submit" data-i18n="booking.search">Search rooms</button>
+          <div class="booking-actions">
+            <button type="submit" data-i18n="booking.search">Search rooms</button>
+            <button class="booking-secondary" id="bookRoomButton" type="button" data-i18n="booking.bookSelected">Book stay</button>
+          </div>
           <p class="form-status booking-status" id="bookingStatus" role="status" aria-live="polite"></p>
         </form>
       </section>
@@ -265,6 +268,16 @@
                 <strong id="authProfileName">Guest</strong>
                 <small id="authProfileEmail"></small>
               </div>
+              <div class="booking-history" id="bookingHistory" hidden>
+                <div class="booking-history-head">
+                  <div>
+                    <span data-i18n="account.myBookingsLabel">Bookings</span>
+                    <strong data-i18n="account.myBookings">My bookings</strong>
+                  </div>
+                  <button id="refreshBookings" type="button" data-i18n="account.refreshBookings">Refresh</button>
+                </div>
+                <div class="booking-list" id="bookingList"></div>
+              </div>
               <p class="form-status" id="authStatus" role="status" aria-live="polite"></p>
               <button class="auth-logout" id="logoutButton" type="button" hidden data-i18n="account.logout">Logout</button>
             </div>
@@ -354,7 +367,7 @@
     <script
       src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"
     ></script>
-    <script src="api-contract.js?v=20260530-api-sync"></script>
-    <script src="dom.js?v=20260531-date-control"></script>
+    <script src="api-contract.js?v=20260601-booking-api"></script>
+    <script src="dom.js?v=20260601-booking-api"></script>
   </body>
 </html>

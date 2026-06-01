@@ -50,10 +50,26 @@ const isLowPowerDevice =
   (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
   (navigator.deviceMemory && navigator.deviceMemory <= 4);
 document.documentElement.classList.toggle("low-power", Boolean(isLowPowerDevice));
+
+function formatDateForBackend(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
+  return raw;
+}
+
 const apiContract = window.LuxApiContract || {
   buildAvailabilityPayload: ({ arrivalDate, departureDate, adultCount, childCount }) => ({
-    arrivalDate,
-    departureDate,
+    arrivalDate: formatDateForBackend(arrivalDate),
+    departureDate: formatDateForBackend(departureDate),
+    adult: Number(adultCount),
+    children: Number(childCount),
+  }),
+  buildBookingPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+    roomId: Number(roomId),
+    arrivalDate: formatDateForBackend(arrivalDate),
+    departureDate: formatDateForBackend(departureDate),
     adult: Number(adultCount),
     children: Number(childCount),
   }),
@@ -109,16 +125,22 @@ const translations = {
     "booking.adults": "Adults",
     "booking.children": "Children",
     "booking.search": "Search rooms",
+    "booking.bookSelected": "Book stay",
     "booking.chooseRoom": "Choose room",
     "booking.arrivalDate": "Arrival date",
     "booking.departureDate": "Departure date",
     "booking.selectDate": "Select date",
     "booking.checking": "Checking...",
+    "booking.booking": "Booking...",
     "booking.availableFallback": "Room is available.",
     "booking.unavailableFallback": "Room is not available.",
     "booking.availableRooms": "{{count}} room is available for your stay.",
     "booking.availableRooms_plural": "{{count}} rooms are available for your stay.",
     "booking.noAvailableRooms": "No rooms are available for those dates and guests.",
+    "booking.selectRoom": "Choose an available room before booking.",
+    "booking.signInRequired": "Log in with a guest account before booking.",
+    "booking.bookSuccess": "Booking confirmed for {{room}}. Total: {{total}}.",
+    "booking.bookFailed": "Could not create this booking.",
     "booking.emptyResponse": "Availability checked, but the backend did not return details.",
     "booking.estimatedTotal": " Estimated total: {{total}}.",
     "booking.checkFailed": "Could not check availability.",
@@ -179,6 +201,19 @@ const translations = {
     "account.createdFor": "Account created for {{name}}.",
     "account.connectError": "Cannot connect to the backend auth API.",
     "account.loggedOut": "Logged out.",
+    "account.myBookingsLabel": "Bookings",
+    "account.myBookings": "My bookings",
+    "account.refreshBookings": "Refresh",
+    "account.loadingBookings": "Loading bookings...",
+    "account.noBookings": "No bookings yet.",
+    "account.bookingLoadFailed": "Could not load your bookings.",
+    "account.cancelBooking": "Cancel booking",
+    "account.canceling": "Canceling...",
+    "account.cancelled": "Booking cancelled.",
+    "account.bookingCancelFailed": "Could not cancel this booking.",
+    "account.bookingDates": "{{arrival}} to {{departure}}",
+    "account.bookingGuests": "{{guests}}",
+    "account.bookingTotal": "Total: {{total}}",
     "footer.location": "Amelia Island, Panama",
     "footer.note": "Southern charm, quiet scenery, and casually elegant surroundings near the bay.",
     "footer.contact": "Contact",
@@ -243,16 +278,22 @@ const translations = {
     "booking.adults": "Người lớn",
     "booking.children": "Trẻ em",
     "booking.search": "Tìm phòng",
+    "booking.bookSelected": "Đặt phòng",
     "booking.chooseRoom": "Chọn phòng",
     "booking.arrivalDate": "Ngày đến",
     "booking.departureDate": "Ngày đi",
     "booking.selectDate": "Chọn ngày",
     "booking.checking": "Đang kiểm tra...",
+    "booking.booking": "Đang đặt...",
     "booking.availableFallback": "Phòng còn trống.",
     "booking.unavailableFallback": "Phòng không còn trống.",
     "booking.availableRooms": "Có {{count}} phòng phù hợp cho kỳ nghỉ của bạn.",
     "booking.availableRooms_plural": "Có {{count}} phòng phù hợp cho kỳ nghỉ của bạn.",
     "booking.noAvailableRooms": "Không có phòng phù hợp với ngày và số khách đã chọn.",
+    "booking.selectRoom": "Hãy chọn phòng còn trống trước khi đặt.",
+    "booking.signInRequired": "Đăng nhập tài khoản khách trước khi đặt phòng.",
+    "booking.bookSuccess": "Đã xác nhận đặt {{room}}. Tổng tiền: {{total}}.",
+    "booking.bookFailed": "Không tạo được booking này.",
     "booking.emptyResponse": "Đã kiểm tra phòng, nhưng backend chưa trả về chi tiết.",
     "booking.estimatedTotal": " Tổng dự kiến: {{total}}.",
     "booking.checkFailed": "Không kiểm tra được tình trạng phòng.",
@@ -313,6 +354,19 @@ const translations = {
     "account.createdFor": "Đã tạo tài khoản cho {{name}}.",
     "account.connectError": "Không kết nối được API đăng nhập của backend.",
     "account.loggedOut": "Đã đăng xuất.",
+    "account.myBookingsLabel": "Booking",
+    "account.myBookings": "Booking của tôi",
+    "account.refreshBookings": "Tải lại",
+    "account.loadingBookings": "Đang tải booking...",
+    "account.noBookings": "Chưa có booking nào.",
+    "account.bookingLoadFailed": "Không tải được booking của bạn.",
+    "account.cancelBooking": "Hủy booking",
+    "account.canceling": "Đang hủy...",
+    "account.cancelled": "Đã hủy booking.",
+    "account.bookingCancelFailed": "Không hủy được booking này.",
+    "account.bookingDates": "{{arrival}} đến {{departure}}",
+    "account.bookingGuests": "{{guests}}",
+    "account.bookingTotal": "Tổng: {{total}}",
     "footer.location": "Đảo Amelia, Panama",
     "footer.note": "Nét duyên phương Nam, khung cảnh yên tĩnh và không gian thanh lịch gần vịnh.",
     "footer.contact": "Liên hệ",
@@ -705,6 +759,7 @@ const fallbackRooms = [
 let rooms = [...fallbackRooms];
 let allRooms = [...fallbackRooms];
 let selectedRoomId = rooms[0]?.id || 1;
+let myBookings = [];
 
 function findKnownRoom(room, title) {
   const id = Number(room.id || 0);
@@ -780,6 +835,11 @@ function roomAmenities(room) {
     return room.amenitiesVi;
   }
   return Array.isArray(room.amenities) ? room.amenities : [];
+}
+
+function findRoomById(roomId) {
+  const id = Number(roomId);
+  return rooms.find((room) => room.id === id) || allRooms.find((room) => room.id === id) || fallbackRooms.find((room) => room.id === id);
 }
 
 const experiences = [
@@ -1060,6 +1120,150 @@ function applyAvailableRooms(apiRooms) {
   };
 }
 
+function normalizeBooking(booking = {}) {
+  return {
+    id: String(booking.id || booking.Id || ""),
+    roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
+    arrivalDate: toDateInputLike(booking.arrivalDate || booking.ArrivalDate || ""),
+    departureDate: toDateInputLike(booking.departureDate || booking.DepartureDate || ""),
+    adult: Number(booking.adult ?? booking.Adult ?? booking.adults ?? booking.Adults ?? 1),
+    children: Number(booking.children ?? booking.Children ?? 0),
+    totalPrice: Number(booking.totalPrice ?? booking.TotalPrice ?? 0),
+    status: String(booking.bookingStatus || booking.BookingStatus || ""),
+  };
+}
+
+function bookingStatusClass(status = "") {
+  return `is-${status.toLowerCase().replace(/[^a-z0-9]/g, "") || "pending"}`;
+}
+
+function canCancelBooking(booking) {
+  if (booking.status !== "Confirmed") return false;
+  if (!booking.arrivalDate) return true;
+  const arrival = new Date(`${booking.arrivalDate}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return arrival > today;
+}
+
+function renderBookingHistory(message = "") {
+  const history = $("#bookingHistory");
+  const list = $("#bookingList");
+  if (!history || !list) return;
+
+  const auth = getStoredAuth();
+  history.hidden = !auth?.token;
+  if (!auth?.token) {
+    list.innerHTML = "";
+    return;
+  }
+
+  if (message) {
+    list.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
+    return;
+  }
+
+  if (!myBookings.length) {
+    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookings"))}</p>`;
+    return;
+  }
+
+  list.innerHTML = myBookings
+    .map((booking) => {
+      const room = findRoomById(booking.roomId);
+      const roomName = room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim();
+      const status = booking.status || "Pending";
+      const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
+      return `
+        <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
+          <div class="booking-item-header">
+            <div>
+              <p class="booking-item-kicker">${escapeHtml(t("account.bookingDates", {
+                arrival: formatBookingDate(booking.arrivalDate),
+                departure: formatBookingDate(booking.departureDate),
+              }))}</p>
+              <h3>${escapeHtml(roomName)}</h3>
+            </div>
+            <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
+          </div>
+          <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
+          <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
+          <div class="booking-item-actions">
+            <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function fetchMyBookings({ silent = false } = {}) {
+  const auth = getStoredAuth();
+  if (!auth?.token) {
+    myBookings = [];
+    renderBookingHistory();
+    return;
+  }
+
+  if (!silent) renderBookingHistory(t("account.loadingBookings"));
+
+  try {
+    const response = await apiFetch("/bookings/my", {
+      headers: {
+        ...authHeader(),
+      },
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      myBookings = [];
+      renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
+      return;
+    }
+
+    myBookings = apiContract
+      .readItems(data)
+      .map(normalizeBooking)
+      .filter((booking) => booking.id);
+    renderBookingHistory();
+  } catch (error) {
+    console.error("My bookings API error:", error);
+    myBookings = [];
+    renderBookingHistory(t("account.bookingLoadFailed"));
+  }
+}
+
+async function cancelBooking(bookingId, button) {
+  if (!bookingId || !button) return;
+
+  button.disabled = true;
+  button.textContent = t("account.canceling");
+
+  try {
+    const response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+      method: "PATCH",
+      headers: {
+        ...authHeader(),
+      },
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      showToast("error", formatApiError(data, t("account.bookingCancelFailed")));
+      return;
+    }
+
+    showToast("success", data?.message || data?.Message || t("account.cancelled"));
+    await fetchMyBookings({ silent: true });
+  } catch (error) {
+    console.error("Cancel booking API error:", error);
+    showToast("error", t("account.bookingCancelFailed"));
+  } finally {
+    button.disabled = false;
+    button.textContent = t("account.cancelBooking");
+  }
+}
+
 function renderReviews() {
   $("#reviewsGrid").innerHTML = reviews
     .map(
@@ -1266,6 +1470,7 @@ function renderLocalizedContent() {
   renderGallery();
   renderExperience();
   updateAccountSummary();
+  renderBookingHistory();
   window.ScrollTrigger?.refresh();
 }
 
@@ -1521,17 +1726,32 @@ function toDateInputValue(date) {
   return `${year}-${month}-${day}`;
 }
 
+function toDateInputLike(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const backendMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})/);
+  if (backendMatch) return `${backendMatch[3]}-${backendMatch[2]}-${backendMatch[1]}`;
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return toDateInputValue(date);
+}
+
 function formatBookingDate(value) {
   if (!value) return "";
 
-  const [year, month, day] = value.split("-");
+  const normalized = toDateInputLike(value);
+  const [year, month, day] = normalized.split("-");
   if (!year || !month || !day) return value;
 
   if (currentLanguage === "vi") {
     return `${day}/${month}/${year}`;
   }
 
-  const date = new Date(`${value}T00:00:00`);
+  const date = new Date(`${normalized}T00:00:00`);
   const monthLabel = new Intl.DateTimeFormat("en", { month: "short" }).format(date);
   return `${day}-${monthLabel}-${year}`;
 }
@@ -1647,6 +1867,7 @@ async function submitAuthForm(form, mode) {
     const enrichedAuth = await refreshAuthProfile(auth);
     const name = getDisplayName(enrichedAuth.user);
     updateAccountSummary(enrichedAuth);
+    await fetchMyBookings({ silent: true });
     form.reset();
     setAuthStatus("success", mode === "login" ? t("account.loggedInAs", { name }) : t("account.createdFor", { name }));
   } catch (error) {
@@ -1662,7 +1883,10 @@ function setupAuthForms() {
   if (!$("#loginForm") || !$("#registerForm")) return;
 
   updateAccountSummary();
-  refreshAuthProfile(getStoredAuth()).then(updateAccountSummary);
+  refreshAuthProfile(getStoredAuth()).then((auth) => {
+    updateAccountSummary(auth);
+    fetchMyBookings({ silent: true });
+  });
 
   $$("[data-auth-tab]").forEach((button) => {
     button.addEventListener("click", () => switchAuthPanel(button.dataset.authTab));
@@ -1680,10 +1904,88 @@ function setupAuthForms() {
 
   $("#logoutButton").addEventListener("click", () => {
     clearStoredAuth();
+    myBookings = [];
     switchAuthPanel("login");
     updateAccountSummary(null);
+    renderBookingHistory();
     setAuthStatus("success", t("account.loggedOut"));
   });
+
+  $("#refreshBookings")?.addEventListener("click", () => fetchMyBookings());
+  $("#bookingList")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-cancel-booking]");
+    if (!button) return;
+    cancelBooking(button.dataset.cancelBooking, button);
+  });
+}
+
+function readBookingFormValues() {
+  return {
+    arrival: $("#arrivalDate").value,
+    departure: $("#departureDate").value,
+    adultCount: readGuestCount("#adult"),
+    childCount: readGuestCount("#children"),
+    roomId: Number.parseInt($("#roomSelect").value || selectedRoomId || allRooms[0]?.id || 0, 10),
+  };
+}
+
+async function createBookingFromForm() {
+  const button = $("#bookRoomButton");
+  const { arrival, departure, adultCount, childCount, roomId } = readBookingFormValues();
+
+  setBookingStatus("", "");
+  if (!validateBookingDates(arrival, departure)) return;
+  if (!validateGuestCounts(adultCount, childCount)) return;
+  if (!roomId || !findRoomById(roomId)) {
+    setBookingStatus("warning", t("booking.selectRoom"));
+    return;
+  }
+
+  const auth = getStoredAuth();
+  if (!auth?.token) {
+    setBookingStatus("warning", t("booking.signInRequired"));
+    document.querySelector("#guest-account")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = t("booking.booking");
+
+  try {
+    const response = await apiFetch("/bookings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader(),
+      },
+      body: JSON.stringify(apiContract.buildBookingPayload({
+        roomId,
+        arrivalDate: arrival,
+        departureDate: departure,
+        adultCount,
+        childCount,
+      })),
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      setBookingStatus("error", formatApiError(data, t("booking.bookFailed")));
+      return;
+    }
+
+    const booking = normalizeBooking(data);
+    const room = findRoomById(booking.roomId || roomId);
+    const roomName = room ? roomTitle(room) : `${t("booking.room")} #${roomId}`;
+    const total = booking.totalPrice ? formatMoney(booking.totalPrice) : formatMoney(room?.priceValue || 0);
+    setBookingStatus("success", t("booking.bookSuccess", { room: roomName, total }));
+    await fetchMyBookings({ silent: true });
+  } catch (error) {
+    console.error("Create booking API error:", error);
+    setBookingStatus("error", t("booking.connectError"));
+  } finally {
+    button.disabled = false;
+    button.textContent = t("booking.bookSelected");
+  }
 }
 
 function setupForms() {
@@ -1715,11 +2017,7 @@ function setupForms() {
 
     const form = event.currentTarget;
     const submitButton = form.querySelector('button[type="submit"]');
-    const arrival = $("#arrivalDate").value;
-    const departure = $("#departureDate").value;
-    const adultCount = readGuestCount("#adult");
-    const childCount = readGuestCount("#children");
-    const roomId = Number.parseInt($("#roomSelect").value || selectedRoomId || allRooms[0]?.id || 0, 10);
+    const { arrival, departure, adultCount, childCount, roomId } = readBookingFormValues();
 
     setBookingStatus("", "");
     if (!validateBookingDates(arrival, departure)) return;
@@ -1778,6 +2076,8 @@ function setupForms() {
       submitButton.textContent = t("booking.search");
     }
   });
+
+  $("#bookRoomButton")?.addEventListener("click", createBookingFromForm);
 
   $("#sign-in-form").addEventListener("submit", (event) => {
     const email = $("#email").value.trim();

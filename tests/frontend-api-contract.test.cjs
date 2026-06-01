@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const {
   buildAvailabilityPayload,
+  buildBookingPayload,
   buildLegacyAvailabilityPayload,
   formatDateForApi,
   readItems,
@@ -31,6 +32,25 @@ test("buildAvailabilityPayload matches the booking availability API", () => {
   assert.equal(Object.hasOwn(payload, "adults"), false);
   assert.equal(Object.hasOwn(payload, "adultCount"), false);
   assert.equal(Object.hasOwn(payload, "childCount"), false);
+});
+
+test("buildBookingPayload matches the authenticated booking API", () => {
+  assert.deepEqual(
+    buildBookingPayload({
+      roomId: "3",
+      arrivalDate: "2026-06-03",
+      departureDate: "2026-06-05",
+      adultCount: "2",
+      childCount: "1",
+    }),
+    {
+      roomId: 3,
+      arrivalDate: "03-06-2026",
+      departureDate: "05-06-2026",
+      adult: 2,
+      children: 1,
+    }
+  );
 });
 
 test("buildLegacyAvailabilityPayload keeps the current deployed API working during rollout", () => {

@@ -44,6 +44,16 @@
     };
   }
 
+  function buildBookingPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }) {
+    return {
+      roomId: Number(roomId),
+      arrivalDate: formatDateForApi(arrivalDate),
+      departureDate: formatDateForApi(departureDate),
+      adult: Number(adultCount),
+      children: Number(childCount),
+    };
+  }
+
   function buildLegacyAvailabilityPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }) {
     return {
       roomId: Number(roomId),
@@ -59,6 +69,7 @@
 
   return {
     buildAvailabilityPayload,
+    buildBookingPayload,
     buildLegacyAvailabilityPayload,
     formatDateForApi,
     readItems,
