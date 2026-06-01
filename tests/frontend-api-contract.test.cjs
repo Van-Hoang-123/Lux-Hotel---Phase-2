@@ -5,6 +5,7 @@ const {
   buildAvailabilityPayload,
   buildBookingPayload,
   buildLegacyAvailabilityPayload,
+  buildLegacyBookingPayload,
   formatDateForApi,
   formatDateForLegacyApi,
   readItems,
@@ -42,6 +43,8 @@ test("buildBookingPayload matches the authenticated booking API", () => {
   assert.deepEqual(
     buildBookingPayload({
       roomId: "3",
+      guestFullName: "Vivu Nguyen",
+      guestEmail: "vivu@example.com",
       arrivalDate: "2026-06-03",
       departureDate: "2026-06-05",
       adultCount: "2",
@@ -49,10 +52,38 @@ test("buildBookingPayload matches the authenticated booking API", () => {
     }),
     {
       roomId: 3,
+      guestFullName: "Vivu Nguyen",
+      guestEmail: "vivu@example.com",
       arrivalDate: "2026-06-03",
       departureDate: "2026-06-05",
       adultCount: 2,
       childCount: 1,
+    }
+  );
+});
+
+test("buildLegacyBookingPayload keeps guest profile fields while supporting the older booking API", () => {
+  assert.deepEqual(
+    buildLegacyBookingPayload({
+      roomId: "2",
+      guestFullName: "Vivu Nguyen",
+      guestEmail: "vivu@example.com",
+      arrivalDate: "2026-06-03",
+      departureDate: "2026-06-05",
+      adultCount: "2",
+      childCount: "1",
+    }),
+    {
+      roomId: 2,
+      arrivalDate: "03-06-2026",
+      departureDate: "05-06-2026",
+      adults: 2,
+      adult: 2,
+      adultCount: 2,
+      children: 1,
+      childCount: 1,
+      guestFullName: "Vivu Nguyen",
+      guestEmail: "vivu@example.com",
     }
   );
 });

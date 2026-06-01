@@ -76,8 +76,10 @@ const apiContract = window.LuxApiContract || {
     adultCount: Number(adultCount),
     childCount: Number(childCount),
   }),
-  buildBookingPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+  buildBookingPayload: ({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
+    guestFullName: String(guestFullName || "").trim(),
+    guestEmail: String(guestEmail || "").trim(),
     arrivalDate: formatDateForBackend(arrivalDate),
     departureDate: formatDateForBackend(departureDate),
     adultCount: Number(adultCount),
@@ -93,12 +95,17 @@ const apiContract = window.LuxApiContract || {
     children: Number(childCount),
     childCount: Number(childCount),
   }),
-  buildLegacyBookingPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+  buildLegacyBookingPayload: ({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
+    guestFullName: String(guestFullName || "").trim(),
+    guestEmail: String(guestEmail || "").trim(),
     arrivalDate: formatDateForLegacyBackend(arrivalDate),
     departureDate: formatDateForLegacyBackend(departureDate),
     adult: Number(adultCount),
+    adults: Number(adultCount),
+    adultCount: Number(adultCount),
     children: Number(childCount),
+    childCount: Number(childCount),
   }),
   readItems: (data) => (Array.isArray(data) ? data : data?.items || data?.Items || []),
 };
@@ -156,6 +163,7 @@ const translations = {
     "booking.noAvailableRooms": "No rooms are available for those dates and guests.",
     "booking.selectRoom": "Choose an available room before booking.",
     "booking.signInRequired": "Log in with a guest account before booking.",
+    "booking.guestProfileMissing": "Your account profile needs a full name and email before booking.",
     "booking.bookSuccess": "Booking confirmed for {{room}}. Total: {{total}}.",
     "booking.bookFailed": "Could not create this booking.",
     "booking.emptyResponse": "Availability checked, but the backend did not return details.",
@@ -309,6 +317,7 @@ const translations = {
     "booking.noAvailableRooms": "Không có phòng phù hợp với ngày và số khách đã chọn.",
     "booking.selectRoom": "Hãy chọn phòng còn trống trước khi đặt.",
     "booking.signInRequired": "Đăng nhập tài khoản khách trước khi đặt phòng.",
+    "booking.guestProfileMissing": "Tài khoản cần có họ tên và email trước khi đặt phòng.",
     "booking.bookSuccess": "Đã xác nhận đặt {{room}}. Tổng tiền: {{total}}.",
     "booking.bookFailed": "Không tạo được booking này.",
     "booking.emptyResponse": "Đã kiểm tra phòng, nhưng backend chưa trả về chi tiết.",
@@ -608,6 +617,13 @@ function getDisplayName(user = {}) {
   return user.fullName || user.email || t("account.guest");
 }
 
+function getBookingGuest(auth = getStoredAuth()) {
+  const user = auth?.user || {};
+  const guestEmail = firstValue(user.email, user.Email);
+  const guestFullName = firstValue(user.fullName, user.FullName, user.name, user.Name, guestEmail);
+  return { guestFullName, guestEmail };
+}
+
 async function refreshAuthProfile(auth) {
   if (!auth?.token) return auth;
 
@@ -665,6 +681,8 @@ function shouldRetryLegacyBookingPayload(response, data) {
     "json value could not be converted",
     "arrivaldate",
     "departuredate",
+    "adult field",
+    "children field",
     "adultcount",
     "childcount",
     "định dạng ngày",
@@ -1150,16 +1168,32 @@ function applyAvailableRooms(apiRooms) {
   };
 }
 
+function normalizeBookingStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const statusMap = {
+    "1": "Confirmed",
+    "2": "Cancelled",
+    "3": "CheckedOut",
+    confirmed: "Confirmed",
+    cancelled: "Cancelled",
+    checkedout: "CheckedOut",
+    "checked out": "CheckedOut",
+  };
+  return statusMap[raw.toLowerCase()] || raw;
+}
+
 function normalizeBooking(booking = {}) {
   return {
     id: String(booking.id || booking.Id || ""),
     roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
+    roomTitle: firstValue(booking.roomTitle, booking.RoomTitle, booking.roomName, booking.RoomName),
     arrivalDate: toDateInputLike(booking.arrivalDate || booking.ArrivalDate || ""),
     departureDate: toDateInputLike(booking.departureDate || booking.DepartureDate || ""),
-    adult: Number(booking.adult ?? booking.Adult ?? booking.adults ?? booking.Adults ?? 1),
-    children: Number(booking.children ?? booking.Children ?? 0),
+    adult: Number(booking.adultCount ?? booking.AdultCount ?? booking.adult ?? booking.Adult ?? booking.adults ?? booking.Adults ?? 1),
+    children: Number(booking.childCount ?? booking.ChildCount ?? booking.children ?? booking.Children ?? 0),
     totalPrice: Number(booking.totalPrice ?? booking.TotalPrice ?? 0),
-    status: String(booking.bookingStatus || booking.BookingStatus || ""),
+    status: normalizeBookingStatus(booking.bookingStatus ?? booking.BookingStatus ?? booking.status ?? booking.Status),
   };
 }
 
@@ -1201,7 +1235,7 @@ function renderBookingHistory(message = "") {
   list.innerHTML = myBookings
     .map((booking) => {
       const room = findRoomById(booking.roomId);
-      const roomName = room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim();
+      const roomName = booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
       const status = booking.status || "Pending";
       const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
       return `
@@ -1270,13 +1304,23 @@ async function cancelBooking(bookingId, button) {
   button.textContent = t("account.canceling");
 
   try {
-    const response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+    let response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
       method: "PATCH",
       headers: {
         ...authHeader(),
       },
     });
-    const data = await readJson(response);
+    let data = await readJson(response);
+
+    if (!response.ok && [404, 405].includes(response.status)) {
+      response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}`, {
+        method: "DELETE",
+        headers: {
+          ...authHeader(),
+        },
+      });
+      data = await readJson(response);
+    }
 
     if (!response.ok) {
       showToast("error", formatApiError(data, t("account.bookingCancelFailed")));
@@ -1997,6 +2041,15 @@ async function createBookingFromForm() {
     return;
   }
 
+  const bookingAuth = await refreshAuthProfile(auth);
+  updateAccountSummary(bookingAuth);
+  const bookingGuest = getBookingGuest(bookingAuth);
+  if (!bookingGuest.guestFullName || !bookingGuest.guestEmail) {
+    setBookingStatus("warning", t("booking.guestProfileMissing"));
+    document.querySelector("#guest-account")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
   button.disabled = true;
   button.textContent = t("booking.booking");
 
@@ -2005,10 +2058,11 @@ async function createBookingFromForm() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeader(),
+        Authorization: `Bearer ${bookingAuth.token}`,
       },
       body: JSON.stringify(apiContract.buildBookingPayload({
         roomId,
+        ...bookingGuest,
         arrivalDate: arrival,
         departureDate: departure,
         adultCount,
@@ -2022,10 +2076,11 @@ async function createBookingFromForm() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...authHeader(),
+          Authorization: `Bearer ${bookingAuth.token}`,
         },
         body: JSON.stringify(apiContract.buildLegacyBookingPayload({
           roomId,
+          ...bookingGuest,
           arrivalDate: arrival,
           departureDate: departure,
           adultCount,

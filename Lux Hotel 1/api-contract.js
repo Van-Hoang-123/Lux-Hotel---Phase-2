@@ -72,9 +72,11 @@
     };
   }
 
-  function buildBookingPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }) {
+  function buildBookingPayload({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) {
     return {
       roomId: Number(roomId),
+      guestFullName: String(guestFullName || "").trim(),
+      guestEmail: String(guestEmail || "").trim(),
       arrivalDate: formatDateForApi(arrivalDate),
       departureDate: formatDateForApi(departureDate),
       adultCount: Number(adultCount),
@@ -95,7 +97,13 @@
     };
   }
 
-  const buildLegacyBookingPayload = buildLegacyAvailabilityPayload;
+  function buildLegacyBookingPayload({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) {
+    return {
+      ...buildLegacyAvailabilityPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }),
+      guestFullName: String(guestFullName || "").trim(),
+      guestEmail: String(guestEmail || "").trim(),
+    };
+  }
 
   return {
     buildAvailabilityPayload,

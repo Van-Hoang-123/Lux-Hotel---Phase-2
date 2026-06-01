@@ -35,4 +35,7 @@ test("frontend exposes the user booking controller actions", () => {
   assert.match(dom, /apiFetch\("\/bookings\/my"/);
   assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/cancel/);
   assert.match(dom, /buildBookingPayload/);
+  assert.match(dom, /getBookingGuest/);
+  assert.match(dom, /guestFullName/);
+  assert.match(dom, /guestEmail/);
 });
