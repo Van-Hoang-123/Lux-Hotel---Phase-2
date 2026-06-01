@@ -43,7 +43,7 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
   ? localStorage.getItem(languageStorageKey)
   : "en";
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
-let paymentApiAvailable = true;
+let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
@@ -565,10 +565,28 @@ function apiRootFromBase(baseUrl) {
 
 function getStoredAuth() {
   try {
-    return JSON.parse(localStorage.getItem(authStorageKey) || "null");
+    const auth = JSON.parse(localStorage.getItem(authStorageKey) || "null");
+    if (isAuthExpired(auth)) {
+      clearStoredAuth();
+      return null;
+    }
+    return auth;
   } catch {
     return null;
   }
+}
+
+function isAuthExpired(auth) {
+  if (!auth?.token) return false;
+
+  const expiry = auth.expiresAtUtc ? new Date(auth.expiresAtUtc).getTime() : Number.NaN;
+  if (Number.isFinite(expiry)) {
+    return expiry <= Date.now() + 30_000;
+  }
+
+  const claims = readJwtPayload(auth.token);
+  const exp = Number(claims.exp);
+  return Number.isFinite(exp) && exp * 1000 <= Date.now() + 30_000;
 }
 
 function readJwtPayload(token) {
@@ -1385,6 +1403,15 @@ async function fetchMyBookings({ silent = false } = {}) {
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        clearStoredAuth();
+        myBookings = [];
+        updateAccountSummary(null);
+        renderBookingHistory();
+        setAuthStatus("warning", t("booking.signInRequired"));
+        return;
+      }
+
       myBookings = [];
       renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
       return;
@@ -2125,6 +2152,7 @@ async function submitAuthForm(form, mode) {
     const enrichedAuth = await refreshAuthProfile(auth);
     const name = getDisplayName(enrichedAuth.user);
     updateAccountSummary(enrichedAuth);
+    await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
     form.reset();
     setAuthStatus("success", mode === "login" ? t("account.loggedInAs", { name }) : t("account.createdFor", { name }));
@@ -2141,10 +2169,10 @@ function setupAuthForms() {
   if (!$("#loginForm") || !$("#registerForm")) return;
 
   updateAccountSummary();
-  refreshAuthProfile(getStoredAuth()).then((auth) => {
+  refreshAuthProfile(getStoredAuth()).then(async (auth) => {
     updateAccountSummary(auth);
-    fetchMyBookings({ silent: true });
-    detectPaymentApiSupport();
+    await detectPaymentApiSupport();
+    await fetchMyBookings({ silent: true });
   });
 
   $$("[data-auth-tab]").forEach((button) => {
