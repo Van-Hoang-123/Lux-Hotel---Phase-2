@@ -43,7 +43,7 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
   ? localStorage.getItem(languageStorageKey)
   : "en";
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
-let paymentApiAvailable = false;
+let paymentApiAvailable = true;
 let paymentApiProbeStarted = false;
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
@@ -1234,6 +1234,7 @@ function normalizeBookingStatus(value) {
     "1": "Confirmed",
     "2": "Cancelled",
     "3": "CheckedOut",
+    pending: "Pending",
     confirmed: "Confirmed",
     cancelled: "Cancelled",
     checkedout: "CheckedOut",
@@ -1287,10 +1288,9 @@ function canCancelBooking(booking) {
 
 function canCompletePayment(booking) {
   return (
-    paymentApiAvailable &&
     userHasRole(getStoredAuth(), "Admin") &&
     Boolean(booking.id) &&
-    booking.status === "Confirmed" &&
+    ["Confirmed", "Pending"].includes(booking.status) &&
     !isPaymentCompleted(booking.paymentStatus)
   );
 }
@@ -1366,12 +1366,23 @@ async function fetchMyBookings({ silent = false } = {}) {
   if (!silent) renderBookingHistory(t("account.loadingBookings"));
 
   try {
-    const response = await apiFetch("/bookings/my", {
+    const bookingPath = userHasRole(auth, "Admin") ? "/bookings" : "/bookings/my";
+    let response = await apiFetch(bookingPath, {
       headers: {
         ...authHeader(),
       },
+      returnStatuses: [404, 405],
     });
-    const data = await readJson(response);
+    let data = await readJson(response);
+
+    if (!response.ok && [404, 405].includes(response.status) && bookingPath !== "/bookings/my") {
+      response = await apiFetch("/bookings/my", {
+        headers: {
+          ...authHeader(),
+        },
+      });
+      data = await readJson(response);
+    }
 
     if (!response.ok) {
       myBookings = [];
