@@ -44,5 +44,8 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/complete-payment/);
   assert.match(dom, /data-complete-payment/);
   assert.match(dom, /account\.paymentUnavailable/);
+  assert.match(dom, /paymentApiAvailable/);
+  assert.match(dom, /userHasRole\(getStoredAuth\(\), "Admin"\)/);
+  assert.match(dom, /returnStatuses: \[400, 401, 403, 404, 405\]/);
   assert.match(css, /\.booking-item-actions \.payment-action/);
 });

@@ -43,6 +43,8 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
   ? localStorage.getItem(languageStorageKey)
   : "en";
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
+let paymentApiAvailable = false;
+let paymentApiProbeStarted = false;
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
   prefersReducedMotion ||
@@ -242,6 +244,7 @@ const translations = {
     "account.paymentFailed": "Could not complete this payment.",
     "account.paymentUnavailable": "Payment API is not available on this backend yet.",
     "account.paymentForbidden": "This account cannot complete payments on the backend.",
+    "account.paymentIdMismatch": "Payment API does not match the current booking ID format.",
     "account.paymentStatus": "Payment: {{status}}",
     "account.paymentPending": "Pending",
     "account.paymentCompletedStatus": "Completed",
@@ -405,6 +408,7 @@ const translations = {
     "account.paymentFailed": "Không hoàn tất được thanh toán này.",
     "account.paymentUnavailable": "Backend hiện chưa có Payment API.",
     "account.paymentForbidden": "Tài khoản này chưa được backend cho phép hoàn tất thanh toán.",
+    "account.paymentIdMismatch": "Payment API chưa khớp kiểu mã booking hiện tại.",
     "account.paymentStatus": "Thanh toán: {{status}}",
     "account.paymentPending": "Chờ thanh toán",
     "account.paymentCompletedStatus": "Đã thanh toán",
@@ -440,14 +444,16 @@ const translations = {
 };
 
 async function apiFetch(path, options = {}) {
+  const { returnStatuses = [], ...fetchOptions } = options;
+  const statusesToReturn = new Set(returnStatuses);
   const orderedCandidates = [...new Set([apiBaseUrl, ...apiCandidates])];
   let lastError;
 
   for (const baseUrl of orderedCandidates) {
     try {
-      const response = await fetch(`${baseUrl}${path}`, options);
+      const response = await fetch(`${baseUrl}${path}`, fetchOptions);
 
-      if (response.ok) {
+      if (response.ok || statusesToReturn.has(response.status)) {
         apiBaseUrl = baseUrl;
         return response;
       }
@@ -553,6 +559,10 @@ function authHeader() {
   return auth?.token ? { Authorization: `Bearer ${auth.token}` } : {};
 }
 
+function apiRootFromBase(baseUrl) {
+  return normalizeApiBase(baseUrl).replace(/\/api$/i, "");
+}
+
 function getStoredAuth() {
   try {
     return JSON.parse(localStorage.getItem(authStorageKey) || "null");
@@ -635,11 +645,42 @@ function getDisplayName(user = {}) {
   return user.fullName || user.email || t("account.guest");
 }
 
+function userHasRole(auth, roleName) {
+  const target = String(roleName || "").toLowerCase();
+  const roles = auth?.user?.roles || [];
+  return roles.some((role) => String(role).toLowerCase() === target);
+}
+
 function getBookingGuest(auth = getStoredAuth()) {
   const user = auth?.user || {};
   const guestEmail = firstValue(user.email, user.Email);
   const guestFullName = firstValue(user.fullName, user.FullName, user.name, user.Name, guestEmail);
   return { guestFullName, guestEmail };
+}
+
+async function detectPaymentApiSupport() {
+  if (paymentApiProbeStarted) return paymentApiAvailable;
+  paymentApiProbeStarted = true;
+
+  const roots = [...new Set([apiBaseUrl, ...apiCandidates].map(apiRootFromBase).filter(Boolean))];
+  for (const root of roots) {
+    try {
+      const response = await fetch(`${root}/swagger/v1/swagger.json`);
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const paths = Object.keys(data?.paths || {}).map((path) => path.toLowerCase());
+      paymentApiAvailable = paths.some((path) => path.includes("complete-payment") || path.includes("payment"));
+      renderBookingHistory();
+      return paymentApiAvailable;
+    } catch {
+      // Swagger is optional; if it is unavailable, keep payment actions hidden.
+    }
+  }
+
+  paymentApiAvailable = false;
+  renderBookingHistory();
+  return paymentApiAvailable;
 }
 
 async function refreshAuthProfile(auth) {
@@ -1250,7 +1291,13 @@ function canCancelBooking(booking) {
 }
 
 function canCompletePayment(booking) {
-  return Boolean(booking.id) && booking.status === "Confirmed" && !isPaymentCompleted(booking.paymentStatus);
+  return (
+    paymentApiAvailable &&
+    userHasRole(getStoredAuth(), "Admin") &&
+    Boolean(booking.id) &&
+    booking.status === "Confirmed" &&
+    !isPaymentCompleted(booking.paymentStatus)
+  );
 }
 
 function renderBookingHistory(message = "") {
@@ -1399,6 +1446,7 @@ async function completePayment(bookingId, button) {
   try {
     const response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/complete-payment`, {
       method: "PATCH",
+      returnStatuses: [400, 401, 403, 404, 405],
       headers: {
         ...authHeader(),
       },
@@ -1407,11 +1455,19 @@ async function completePayment(bookingId, button) {
 
     if (!response.ok) {
       if ([404, 405].includes(response.status)) {
+        paymentApiAvailable = false;
+        renderBookingHistory();
         showToast("warning", t("account.paymentUnavailable"));
         return;
       }
       if ([401, 403].includes(response.status)) {
         showToast("warning", t("account.paymentForbidden"));
+        return;
+      }
+
+      const message = formatApiError(data, "").toLowerCase();
+      if (response.status === 400 && (message.includes("not valid") || message.includes("guid") || message.includes("id"))) {
+        showToast("warning", t("account.paymentIdMismatch"));
         return;
       }
 
@@ -2080,6 +2136,7 @@ function setupAuthForms() {
   refreshAuthProfile(getStoredAuth()).then((auth) => {
     updateAccountSummary(auth);
     fetchMyBookings({ silent: true });
+    detectPaymentApiSupport();
   });
 
   $$("[data-auth-tab]").forEach((button) => {
