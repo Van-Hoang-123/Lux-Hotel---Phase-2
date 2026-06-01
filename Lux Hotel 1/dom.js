@@ -2557,7 +2557,7 @@ function setupAnimations() {
     },
   });
 
-  gsap.utils.toArray(".intro-grid > *, .section-heading, .experience-content, .account-copy, .auth-shell").forEach((item) => {
+  gsap.utils.toArray(".intro-grid > *, .section-heading, .experience-content").forEach((item) => {
     gsap.from(item, {
       y: 34,
       opacity: 0,
