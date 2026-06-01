@@ -6,16 +6,20 @@ const {
   buildBookingPayload,
   buildLegacyAvailabilityPayload,
   formatDateForApi,
+  formatDateForLegacyApi,
   readItems,
 } = require("../Lux Hotel 1/api-contract.js");
 
-test("formatDateForApi sends dates in the backend dd-MM-yyyy format", () => {
-  assert.equal(formatDateForApi("2026-06-03"), "03-06-2026");
-  assert.equal(formatDateForApi("03-06-2026"), "03-06-2026");
+test("formatDateForApi sends dates in the deployed backend yyyy-MM-dd format", () => {
+  assert.equal(formatDateForApi("2026-06-03"), "2026-06-03");
+  assert.equal(formatDateForApi("03-06-2026"), "2026-06-03");
+  assert.equal(formatDateForApi("03-Jun-2026"), "2026-06-03");
+  assert.equal(formatDateForLegacyApi("2026-06-03"), "03-06-2026");
 });
 
 test("buildAvailabilityPayload matches the booking availability API", () => {
   const payload = buildAvailabilityPayload({
+    roomId: "3",
     arrivalDate: "2026-06-03",
     departureDate: "2026-06-05",
     adultCount: "2",
@@ -23,15 +27,15 @@ test("buildAvailabilityPayload matches the booking availability API", () => {
   });
 
   assert.deepEqual(payload, {
-    arrivalDate: "03-06-2026",
-    departureDate: "05-06-2026",
-    adult: 2,
-    children: 1,
+    roomId: 3,
+    arrivalDate: "2026-06-03",
+    departureDate: "2026-06-05",
+    adultCount: 2,
+    childCount: 1,
   });
-  assert.equal(Object.hasOwn(payload, "roomId"), false);
+  assert.equal(Object.hasOwn(payload, "adult"), false);
   assert.equal(Object.hasOwn(payload, "adults"), false);
-  assert.equal(Object.hasOwn(payload, "adultCount"), false);
-  assert.equal(Object.hasOwn(payload, "childCount"), false);
+  assert.equal(Object.hasOwn(payload, "children"), false);
 });
 
 test("buildBookingPayload matches the authenticated booking API", () => {
@@ -45,10 +49,10 @@ test("buildBookingPayload matches the authenticated booking API", () => {
     }),
     {
       roomId: 3,
-      arrivalDate: "03-06-2026",
-      departureDate: "05-06-2026",
-      adult: 2,
-      children: 1,
+      arrivalDate: "2026-06-03",
+      departureDate: "2026-06-05",
+      adultCount: 2,
+      childCount: 1,
     }
   );
 });
@@ -64,8 +68,8 @@ test("buildLegacyAvailabilityPayload keeps the current deployed API working duri
     }),
     {
       roomId: 2,
-      arrivalDate: "2026-06-03",
-      departureDate: "2026-06-05",
+      arrivalDate: "03-06-2026",
+      departureDate: "05-06-2026",
       adults: 2,
       adult: 2,
       adultCount: 2,

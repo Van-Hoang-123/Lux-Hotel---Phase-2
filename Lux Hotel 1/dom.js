@@ -55,33 +55,50 @@ function formatDateForBackend(value) {
   if (!value) return "";
   const raw = String(value).trim();
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) return `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
+  if (isoMatch) return raw;
+  const legacyMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (legacyMatch) return `${legacyMatch[3]}-${legacyMatch[2]}-${legacyMatch[1]}`;
   return raw;
 }
 
+function formatDateForLegacyBackend(value) {
+  const iso = formatDateForBackend(value);
+  const isoMatch = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!isoMatch) return iso;
+  return `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
+}
+
 const apiContract = window.LuxApiContract || {
-  buildAvailabilityPayload: ({ arrivalDate, departureDate, adultCount, childCount }) => ({
+  buildAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+    roomId: Number(roomId),
     arrivalDate: formatDateForBackend(arrivalDate),
     departureDate: formatDateForBackend(departureDate),
-    adult: Number(adultCount),
-    children: Number(childCount),
+    adultCount: Number(adultCount),
+    childCount: Number(childCount),
   }),
   buildBookingPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
     arrivalDate: formatDateForBackend(arrivalDate),
     departureDate: formatDateForBackend(departureDate),
-    adult: Number(adultCount),
-    children: Number(childCount),
+    adultCount: Number(adultCount),
+    childCount: Number(childCount),
   }),
   buildLegacyAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
-    arrivalDate,
-    departureDate,
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
     adults: Number(adultCount),
     adult: Number(adultCount),
     adultCount: Number(adultCount),
     children: Number(childCount),
     childCount: Number(childCount),
+  }),
+  buildLegacyBookingPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
+    roomId: Number(roomId),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    children: Number(childCount),
   }),
   readItems: (data) => (Array.isArray(data) ? data : data?.items || data?.Items || []),
 };
@@ -639,6 +656,19 @@ function formatApiError(data, fallback) {
 
   if (data.message || data.Message) return data.message || data.Message;
   return data.title || data.Title || fallback;
+}
+
+function shouldRetryLegacyBookingPayload(response, data) {
+  if (![400, 415, 422].includes(response?.status)) return false;
+  const message = formatApiError(data, "").toLowerCase();
+  return [
+    "json value could not be converted",
+    "arrivaldate",
+    "departuredate",
+    "adultcount",
+    "childcount",
+    "định dạng ngày",
+  ].some((needle) => message.includes(needle));
 }
 
 function readBoolean(value) {
@@ -1771,6 +1801,25 @@ function updateDateDisplays() {
   $$("input[type='date']").forEach(updateDateDisplay);
 }
 
+function openNativeDatePicker(input) {
+  if (!input) return;
+  input.focus({ preventScroll: true });
+  if (typeof input.showPicker !== "function") return;
+
+  try {
+    input.showPicker();
+  } catch {
+    // Some browsers only allow the default native click path.
+  }
+}
+
+function setupDatePickerControls() {
+  $$(".date-control").forEach((control) => {
+    const input = $("input[type='date']", control);
+    control.addEventListener("click", () => openNativeDatePicker(input));
+  });
+}
+
 function addDays(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -1952,7 +2001,7 @@ async function createBookingFromForm() {
   button.textContent = t("booking.booking");
 
   try {
-    const response = await apiFetch("/bookings", {
+    let response = await apiFetch("/bookings", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1966,7 +2015,25 @@ async function createBookingFromForm() {
         childCount,
       })),
     });
-    const data = await readJson(response);
+    let data = await readJson(response);
+
+    if (!response.ok && typeof apiContract.buildLegacyBookingPayload === "function" && shouldRetryLegacyBookingPayload(response, data)) {
+      response = await apiFetch("/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify(apiContract.buildLegacyBookingPayload({
+          roomId,
+          arrivalDate: arrival,
+          departureDate: departure,
+          adultCount,
+          childCount,
+        })),
+      });
+      data = await readJson(response);
+    }
 
     if (!response.ok) {
       setBookingStatus("error", formatApiError(data, t("booking.bookFailed")));
@@ -1991,6 +2058,7 @@ async function createBookingFromForm() {
 function setupForms() {
   const roomSelect = $("#roomSelect");
   setupDateBounds();
+  setupDatePickerControls();
 
   roomSelect.addEventListener("change", () => {
     selectedRoomId = Number(roomSelect.value || rooms[0]?.id || 1);
@@ -2034,6 +2102,7 @@ function setupForms() {
           ...authHeader(),
         },
         body: JSON.stringify(apiContract.buildAvailabilityPayload({
+          roomId,
           arrivalDate: arrival,
           departureDate: departure,
           adultCount,
