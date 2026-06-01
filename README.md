@@ -124,16 +124,26 @@ https://localhost:5255/swagger
 
 ### Authentication
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/api/auth/register` | Register a new account |
-| POST | `/api/auth/login` | Login and receive JWT token |
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/api/auth/register` | Register a new account | — |
+| POST | `/api/auth/login` | Login and receive JWT token | — |
+
+> All newly registered accounts are automatically assigned the `User` role by default.
+
+### Profile
+
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/api/profile` | Get current user's profile | User / Admin |
+| PUT | `/api/profile` | Update current user's profile | User / Admin |
 
 ### Rooms
 
 | Method | Endpoint | Description | Auth |
 | --- | --- | --- | --- |
-| GET | `/api/rooms` | Get all rooms | — |
+| GET | `/api/rooms` | Get all rooms (supports sorting) | — |
+| GET | `/api/rooms?sortBy={field}&order={asc\|desc}` | Get rooms sorted by field | — |
 | GET | `/api/rooms/{id}` | Get room by ID | — |
 | POST | `/api/rooms` | Create a new room | Admin |
 | PUT | `/api/rooms/{id}` | Update room info | Admin |
@@ -144,35 +154,81 @@ https://localhost:5255/swagger
 | Method | Endpoint | Description | Auth |
 | --- | --- | --- | --- |
 | POST | `/api/bookings/check-availability` | Check room availability | — |
-| POST | `/api/bookings` | Create a booking | User |
-| GET | `/api/bookings/my` | View booking history | User |
+| POST | `/api/bookings` | Create a new booking | User |
+| GET | `/api/bookings/my` | View personal booking history | User |
+| PATCH | `/api/bookings/{id}/cancel` | Cancel a booking | User |
+| PATCH | `/api/bookings/{id}/checkout` | Check out a booking | Admin |
+| PATCH | `/api/bookings/{id}/complete-payment` | Confirm payment completion | Admin |
+| PATCH | `/api/toggle-room-status/{id}` | Toggle room availability status | Admin |
 
 ### Articles
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/api/articles` | Get all articles |
-| GET | `/api/articles/{id}` | Get article by ID |
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/api/articles/getAll` | Get all articles | — |
+| GET | `/api/articles/getById/{id}` | Get article by ID | — |
+| GET | `/api/articles/pagination` | Get articles with pagination (`?pageNumber=1&pageSize=10`) | — |
+| GET | `/api/articles/getByTitle/{title}` | Get articles by title (partial match) | — |
+| GET | `/api/articles/getByCategory/{category}` | Get articles by category | — |
+| POST | `/api/articles` | Create a new article | Admin |
+| PUT | `/api/articles/edit/{id}` | Edit an article by ID | Admin |
+| DELETE | `/api/articles/delete/{id}` | Hard delete an article by ID | Admin |
 
 ---
 
 ## 10. Example Request Bodies
 
-### Check Availability
+### Register
 
 ```http
-POST /api/bookings/check-availability
+POST /api/auth/register
 Content-Type: application/json
 ```
 
 ```json
 {
-  "arrivalDate": "2026-06-01",
-  "departureDate": "2026-06-05",
-  "adults": 2,
-  "children": 1
+  "fullName": "Nguyen Van A",
+  "email": "example@gmail.com",
+  "password": "yourpassword",
+  "phoneNumber": "0901234567"
 }
 ```
+
+> `phoneNumber` is optional.
+
+**Response `201 Created`:**
+
+```json
+{
+  "token": "<jwt_token>",
+  "user": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "fullName": "Nguyen Van A",
+    "email": "example@gmail.com",
+    "phoneNumber": "0901234567",
+    "role": "User"
+  }
+}
+```
+
+**Response `409 Conflict`:**
+
+```json
+{
+  "message": "Email is already registered."
+}
+```
+
+**Response `400 Bad Request`:**
+
+```json
+{
+  "message": "Registration failed.",
+  "errors": ["Passwords must be at least 6 characters."]
+}
+```
+
+---
 
 ### Login
 
@@ -188,6 +244,106 @@ Content-Type: application/json
 }
 ```
 
+**Response `200 OK`:**
+
+```json
+{
+  "token": "<jwt_token>",
+  "user": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "fullName": "Nguyen Van A",
+    "email": "example@gmail.com",
+    "phoneNumber": "0901234567",
+    "role": "User"
+  }
+}
+```
+
+**Response `401 Unauthorized`:**
+
+```json
+{
+  "message": "Invalid email or password."
+}
+```
+
+---
+
+### Get Profile
+
+```http
+GET /api/profile
+Authorization: Bearer <token>
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "fullName": "Nguyen Van A",
+  "email": "example@gmail.com",
+  "phoneNumber": "0901234567",
+  "role": "User"
+}
+```
+
+**Response `401 Unauthorized`:**
+
+```json
+{
+  "message": "User is not authenticated."
+}
+```
+
+---
+
+### Update Profile
+
+```http
+PUT /api/profile
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "fullName": "Nguyen Van B",
+  "phoneNumber": "0987654321"
+}
+```
+
+> `phoneNumber` is optional — omit or send empty string to clear it.
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "fullName": "Nguyen Van B",
+  "email": "example@gmail.com",
+  "phoneNumber": "0987654321",
+  "role": "User"
+}
+```
+
+**Response `400 Bad Request`:**
+
+```json
+{
+  "message": "Profile update failed.",
+  "errors": ["..."]
+}
+```
+
+**Response `401 Unauthorized`:**
+
+```json
+{
+  "message": "User is not authenticated."
+}
+```
+
 ---
 
 ### Get All Rooms
@@ -196,23 +352,40 @@ Content-Type: application/json
 GET /api/rooms
 ```
 
+Supports optional sorting via query parameters:
+
+| Query Param | Description | Example |
+| --- | --- | --- |
+| `sortBy` | Field to sort by (`pricePerNight`, `capacity`, etc.) | `sortBy=pricePerNight` |
+| `order` | Sort direction: `asc` or `desc` | `order=desc` |
+
+Example with sorting:
+
+```http
+GET /api/rooms?sortBy=pricePerNight&order=desc
+```
+
 **Response `200 OK`:**
 
 ```json
 [
   {
     "id": 1,
-    "title": "Standard Room",
+    "roomType": "Standard Room",
     "imageUrl": "/images/room-standard.jpg",
     "pricePerNight": 60.00,
-    "description": "Warm textures, soft linens, and a private corner for slower mornings."
+    "description": "Warm textures, soft linens, and a private corner for slower mornings.",
+    "isAvailable": true,
+    "capacity": 2
   },
   {
     "id": 2,
-    "title": "Beach Villa",
+    "roomType": "Beach Villa",
     "imageUrl": "/images/room-beach-villa.jpg",
     "pricePerNight": 90.00,
-    "description": "Steps from the shore with open-air lounging and quiet ocean light."
+    "description": "Steps from the shore with open-air lounging and quiet ocean light.",
+    "isAvailable": true,
+    "capacity": 3
   }
 ]
 ```
@@ -230,10 +403,12 @@ GET /api/rooms/{id}
 ```json
 {
   "id": 1,
-  "title": "Standard Room",
+  "roomType": "Standard Room",
   "imageUrl": "/images/room-standard.jpg",
   "pricePerNight": 60.00,
-  "description": "Warm textures, soft linens, and a private corner for slower mornings."
+  "description": "Warm textures, soft linens, and a private corner for slower mornings.",
+  "isAvailable": true,
+  "capacity": 2
 }
 ```
 
@@ -257,10 +432,11 @@ Content-Type: application/json
 
 ```json
 {
-  "title": "Luxury Suite",
+  "roomType": "Luxury Suite",
   "imageUrl": "/images/room-luxury-suite.jpg",
   "pricePerNight": 160.00,
-  "description": "The signature stay: generous space, bay views, and personal service."
+  "description": "The signature stay: generous space, bay views, and personal service.",
+  "capacity": 4
 }
 ```
 
@@ -269,10 +445,12 @@ Content-Type: application/json
 ```json
 {
   "id": 5,
-  "title": "Luxury Suite",
+  "roomType": "Luxury Suite",
   "imageUrl": "/images/room-luxury-suite.jpg",
   "pricePerNight": 160.00,
-  "description": "The signature stay: generous space, bay views, and personal service."
+  "description": "The signature stay: generous space, bay views, and personal service.",
+  "isAvailable": true,
+  "capacity": 4
 }
 ```
 
@@ -288,10 +466,12 @@ Content-Type: application/json
 
 ```json
 {
-  "title": "Luxury Suite",
+  "roomType": "Luxury Suite",
   "imageUrl": "/images/room-luxury-suite-v2.jpg",
   "pricePerNight": 175.00,
-  "description": "Updated description with new amenities."
+  "description": "Updated description with new amenities.",
+  "isAvailable": true,
+  "capacity": 4
 }
 ```
 
@@ -300,10 +480,12 @@ Content-Type: application/json
 ```json
 {
   "id": 5,
-  "title": "Luxury Suite",
+  "roomType": "Luxury Suite",
   "imageUrl": "/images/room-luxury-suite-v2.jpg",
   "pricePerNight": 175.00,
-  "description": "Updated description with new amenities."
+  "description": "Updated description with new amenities.",
+  "isAvailable": true,
+  "capacity": 4
 }
 ```
 
@@ -320,7 +502,375 @@ Authorization: Bearer <token>
 
 ---
 
-## 11. Technologies Used
+### Check Availability
+
+```http
+POST /api/bookings/check-availability
+Content-Type: application/json
+```
+
+```json
+{
+  "arrivalDate": "2026-06-01",
+  "departureDate": "2026-06-05",
+  "adult": 2,
+  "children": 1
+}
+```
+
+**Response `200 OK`:** List of available rooms matching the criteria.
+
+**Response `400 Bad Request`:** Missing dates, departure before arrival, or adult count < 1.
+
+---
+
+### Create Booking *(User only)*
+
+```http
+POST /api/bookings
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "roomId": 1,
+  "arrivalDate": "2026-06-01",
+  "departureDate": "2026-06-05",
+  "adult": 2,
+  "children": 1
+}
+```
+
+**Response `200 OK`:** Booking details with linked payment record (status: `Pending`, method: `Cash`).
+
+**Response `400 Bad Request`:** Room not available, capacity exceeded, or overlapping booking.
+
+**Response `401 Unauthorized`:** Missing or invalid JWT token.
+
+**Response `404 Not Found`:** Room does not exist or is under maintenance.
+
+**Response `500 Internal Server Error`:** Transaction failure — rollback is triggered automatically.
+
+---
+
+### View My Bookings *(User only)*
+
+```http
+GET /api/bookings/my
+Authorization: Bearer <token>
+```
+
+**Response `200 OK`:** List of all bookings belonging to the authenticated user.
+
+**Response `401 Unauthorized`:** Invalid or missing token.
+
+**Response `404 Not Found`:** User not found in the system.
+
+---
+
+### Cancel Booking *(User only)*
+
+```http
+PATCH /api/bookings/{id}/cancel
+Authorization: Bearer <token>
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "message": "Booking has been cancelled successfully."
+}
+```
+
+**Response `400 Bad Request`:** Booking is already cancelled/checked out, or arrival date has passed.
+
+**Response `403 Forbidden`:** Attempting to cancel another user's booking.
+
+**Response `404 Not Found`:** Booking not found.
+
+---
+
+### Checkout Booking *(Admin only)*
+
+```http
+PATCH /api/bookings/{id}/checkout
+Authorization: Bearer <token>
+```
+
+**Response `200 OK`:** Booking status updated to `CheckedOut`.
+
+**Response `400 Bad Request`:** Booking is not in `Confirmed` status.
+
+**Response `404 Not Found`:** Booking not found.
+
+---
+
+### Complete Payment *(Admin only)*
+
+```http
+PATCH /api/bookings/{id}/complete-payment
+Authorization: Bearer <token>
+```
+
+**Response `200 OK`:** Payment record updated to `Completed` with `paidAt` timestamp.
+
+**Response `400 Bad Request`:** Payment has already been completed (idempotency check).
+
+**Response `404 Not Found`:** No payment record linked to this booking.
+
+---
+
+### Toggle Room Status *(Admin only)*
+
+```http
+PATCH /api/toggle-room-status/{id}
+Authorization: Bearer <token>
+```
+
+**Response `204 No Content`:** Room status toggled between available and maintenance.
+
+**Response `400 Bad Request`:** Cannot lock a room that has active guests or future confirmed bookings.
+
+**Response `404 Not Found`:** Room not found.
+
+---
+
+### Get All Articles
+
+```http
+GET /api/articles/getAll
+```
+
+**Response `200 OK`:**
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Electric Feel And Other Things",
+    "author": "admin",
+    "category": "Island",
+    "summary": "How Panama evenings shape the resort mood.",
+    "content": "Full article content here.",
+    "publishedAt": "2026-05-29T06:10:30.2196622"
+  },
+  {
+    "id": 2,
+    "title": "Staying in Style Forever",
+    "author": "admin",
+    "category": "Lifestyle",
+    "summary": "A guide to slower mornings and resort rituals.",
+    "content": "Full article content here.",
+    "publishedAt": "2026-05-29T00:00:00"
+  },
+  {
+    "id": 3,
+    "title": "Why Hotel Comfort Matters",
+    "author": "admin",
+    "category": "Design",
+    "summary": "The small choices behind a calmer stay.",
+    "content": "Full article content here.",
+    "publishedAt": "2026-05-29T00:00:00"
+  }
+]
+```
+
+---
+
+### Get Article By ID
+
+```http
+GET /api/articles/getById/{id}
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": 2,
+  "title": "Staying in Style Forever",
+  "author": "admin",
+  "category": "Lifestyle",
+  "summary": "A guide to slower mornings and resort rituals.",
+  "content": "Full article content here.",
+  "publishedAt": "2026-05-29T00:00:00"
+}
+```
+
+---
+
+### Get Articles with Pagination
+
+```http
+GET /api/articles/pagination?pageNumber=1&pageSize=2
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "title": "Electric Feel And Other Things",
+      "author": "admin",
+      "category": "Island",
+      "summary": "How Panama evenings shape the resort mood.",
+      "content": "Full article content here.",
+      "publishedAt": "2026-05-29T06:10:30.2196622"
+    },
+    {
+      "id": 2,
+      "title": "Staying in Style Forever",
+      "author": "admin",
+      "category": "Lifestyle",
+      "summary": "A guide to slower mornings and resort rituals.",
+      "content": "Full article content here.",
+      "publishedAt": "2026-05-29T00:00:00"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 2,
+  "totalItems": 3,
+  "totalPages": 2,
+  "hasPreviousPage": false,
+  "hasNextPage": true
+}
+```
+
+---
+
+### Get Articles By Title
+
+```http
+GET /api/articles/getByTitle/{title}
+```
+
+**Response `200 OK`:** Returns all articles whose title contains the provided string (partial match).
+
+---
+
+### Get Articles By Category
+
+```http
+GET /api/articles/getByCategory/{category}
+```
+
+Example: `/api/articles/getByCategory/Island`
+
+**Response `200 OK`:**
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Electric Feel And Other Things",
+    "author": "admin",
+    "category": "Island",
+    "summary": "How Panama evenings shape the resort mood.",
+    "content": "Full article content here.",
+    "publishedAt": "2026-05-29T06:10:30.2196622"
+  }
+]
+```
+
+---
+
+### Create Article *(Admin only)*
+
+```http
+POST /api/articles
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "title": "Why Hotel Comfort Matters",
+  "category": "Design",
+  "summary": "The small choices behind a calmer stay.",
+  "content": "Full article content here."
+}
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "message": "create successful"
+}
+```
+
+---
+
+### Edit Article *(Admin only)*
+
+```http
+PUT /api/articles/edit/{id}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "title": "Staying in Style Forever — Updated",
+  "category": "Lifestyle",
+  "summary": "A guide to slower mornings and resort rituals.",
+  "content": "Updated article content here."
+}
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": 2,
+  "title": "Staying in Style Forever — Updated",
+  "author": "admin",
+  "category": "Lifestyle",
+  "summary": "A guide to slower mornings and resort rituals.",
+  "content": "Updated article content here.",
+  "publishedAt": "2026-05-29T08:57:05.1253911"
+}
+```
+
+---
+
+### Delete Article *(Admin only)*
+
+```http
+DELETE /api/articles/delete/{id}
+Authorization: Bearer <token>
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "message": "Delete successfully"
+}
+```
+
+---
+
+## 11. HTTP Status Codes Reference
+
+| Code | Status | When it occurs |
+| --- | --- | --- |
+| 200 | OK | Successful data retrieval, booking created, cancelled, checked out, or payment completed |
+| 201 | Created | Room created successfully |
+| 204 | No Content | Room status toggled successfully (no response body) |
+| 400 | Bad Request | Invalid dates, adult count < 1, room capacity exceeded, overlapping booking, room has active guests/future bookings when locking, cancellation after arrival date, or duplicate payment completion |
+| 401 | Unauthorized | Missing or invalid JWT token, malformed user ID in token |
+| 403 | Forbidden | Attempting to cancel another user's booking |
+| 404 | Not Found | Room, user, booking, or payment record not found |
+| 500 | Internal Server Error | Transaction failure during booking creation — rollback is triggered automatically |
+
+---
+
+## 12. Technologies Used
 
 **Backend:** .NET 9, ASP.NET Core Web API, Entity Framework Core, SQL Server, JWT Authentication, Clean Architecture
 
@@ -328,7 +878,7 @@ Authorization: Bearer <token>
 
 ---
 
-## 12. Project Structure
+## 13. Project Structure
 
 ```text
 Lux-Hotel---Phase-2/
