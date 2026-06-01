@@ -39,3 +39,10 @@ test("frontend exposes the user booking controller actions", () => {
   assert.match(dom, /guestFullName/);
   assert.match(dom, /guestEmail/);
 });
+
+test("frontend exposes the payment completion action from the booking controller", () => {
+  assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/complete-payment/);
+  assert.match(dom, /data-complete-payment/);
+  assert.match(dom, /account\.paymentUnavailable/);
+  assert.match(css, /\.booking-item-actions \.payment-action/);
+});

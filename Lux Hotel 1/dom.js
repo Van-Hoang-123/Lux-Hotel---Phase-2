@@ -236,6 +236,15 @@ const translations = {
     "account.canceling": "Canceling...",
     "account.cancelled": "Booking cancelled.",
     "account.bookingCancelFailed": "Could not cancel this booking.",
+    "account.completePayment": "Complete payment",
+    "account.completingPayment": "Completing...",
+    "account.paymentCompleted": "Payment completed.",
+    "account.paymentFailed": "Could not complete this payment.",
+    "account.paymentUnavailable": "Payment API is not available on this backend yet.",
+    "account.paymentForbidden": "This account cannot complete payments on the backend.",
+    "account.paymentStatus": "Payment: {{status}}",
+    "account.paymentPending": "Pending",
+    "account.paymentCompletedStatus": "Completed",
     "account.bookingDates": "{{arrival}} to {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Total: {{total}}",
@@ -390,6 +399,15 @@ const translations = {
     "account.canceling": "Đang hủy...",
     "account.cancelled": "Đã hủy booking.",
     "account.bookingCancelFailed": "Không hủy được booking này.",
+    "account.completePayment": "Hoàn tất thanh toán",
+    "account.completingPayment": "Đang xử lý...",
+    "account.paymentCompleted": "Đã hoàn tất thanh toán.",
+    "account.paymentFailed": "Không hoàn tất được thanh toán này.",
+    "account.paymentUnavailable": "Backend hiện chưa có Payment API.",
+    "account.paymentForbidden": "Tài khoản này chưa được backend cho phép hoàn tất thanh toán.",
+    "account.paymentStatus": "Thanh toán: {{status}}",
+    "account.paymentPending": "Chờ thanh toán",
+    "account.paymentCompletedStatus": "Đã thanh toán",
     "account.bookingDates": "{{arrival}} đến {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Tổng: {{total}}",
@@ -565,7 +583,7 @@ function normalizeAuthUser(user = {}, token = "") {
   const emailClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
   const idClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
   const roleClaim = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
-  const roles = user.roles || user.Roles || claims.roles || claims.Roles || claims.role || claims[roleClaim] || [];
+  const roles = user.roles || user.Roles || user.role || user.Role || claims.roles || claims.Roles || claims.role || claims[roleClaim] || [];
 
   return {
     id: firstValue(user.id, user.Id, claims.sub, claims.nameid, claims[idClaim]),
@@ -1183,7 +1201,26 @@ function normalizeBookingStatus(value) {
   return statusMap[raw.toLowerCase()] || raw;
 }
 
+function normalizePaymentStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const statusMap = {
+    "1": t("account.paymentPending"),
+    "2": t("account.paymentCompletedStatus"),
+    pending: t("account.paymentPending"),
+    completed: t("account.paymentCompletedStatus"),
+    paid: t("account.paymentCompletedStatus"),
+  };
+  return statusMap[raw.toLowerCase()] || raw;
+}
+
+function isPaymentCompleted(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return ["2", "completed", "paid"].includes(raw);
+}
+
 function normalizeBooking(booking = {}) {
+  const payment = booking.payment || booking.Payment || {};
   return {
     id: String(booking.id || booking.Id || ""),
     roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
@@ -1194,6 +1231,8 @@ function normalizeBooking(booking = {}) {
     children: Number(booking.childCount ?? booking.ChildCount ?? booking.children ?? booking.Children ?? 0),
     totalPrice: Number(booking.totalPrice ?? booking.TotalPrice ?? 0),
     status: normalizeBookingStatus(booking.bookingStatus ?? booking.BookingStatus ?? booking.status ?? booking.Status),
+    paymentStatus: booking.paymentStatus ?? booking.PaymentStatus ?? payment.paymentStatus ?? payment.PaymentStatus ?? "",
+    paidAt: booking.paidAt ?? booking.PaidAt ?? payment.paidAt ?? payment.PaidAt ?? "",
   };
 }
 
@@ -1208,6 +1247,10 @@ function canCancelBooking(booking) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return arrival > today;
+}
+
+function canCompletePayment(booking) {
+  return Boolean(booking.id) && booking.status === "Confirmed" && !isPaymentCompleted(booking.paymentStatus);
 }
 
 function renderBookingHistory(message = "") {
@@ -1238,6 +1281,13 @@ function renderBookingHistory(message = "") {
       const roomName = booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
       const status = booking.status || "Pending";
       const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
+      const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+      const paymentStatusMarkup = paymentStatus
+        ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
+        : "";
+      const paymentActionMarkup = canCompletePayment(booking)
+        ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
+        : "";
       return `
         <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
           <div class="booking-item-header">
@@ -1252,7 +1302,9 @@ function renderBookingHistory(message = "") {
           </div>
           <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
           <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
+          ${paymentStatusMarkup}
           <div class="booking-item-actions">
+            ${paymentActionMarkup}
             <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
           </div>
         </article>
@@ -1335,6 +1387,55 @@ async function cancelBooking(bookingId, button) {
   } finally {
     button.disabled = false;
     button.textContent = t("account.cancelBooking");
+  }
+}
+
+async function completePayment(bookingId, button) {
+  if (!bookingId || !button) return;
+
+  button.disabled = true;
+  button.textContent = t("account.completingPayment");
+
+  try {
+    const response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/complete-payment`, {
+      method: "PATCH",
+      headers: {
+        ...authHeader(),
+      },
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      if ([404, 405].includes(response.status)) {
+        showToast("warning", t("account.paymentUnavailable"));
+        return;
+      }
+      if ([401, 403].includes(response.status)) {
+        showToast("warning", t("account.paymentForbidden"));
+        return;
+      }
+
+      showToast("error", formatApiError(data, t("account.paymentFailed")));
+      return;
+    }
+
+    const paymentStatus = data?.paymentStatus || data?.PaymentStatus || "Completed";
+    const paidAt = data?.paidAt || data?.PaidAt || new Date().toISOString();
+    myBookings = myBookings.map((booking) =>
+      booking.id === String(bookingId)
+        ? { ...booking, paymentStatus, paidAt }
+        : booking
+    );
+    renderBookingHistory();
+    showToast("success", data?.message || data?.Message || t("account.paymentCompleted"));
+  } catch (error) {
+    console.error("Complete payment API error:", error);
+    showToast("error", t("account.paymentFailed"));
+  } finally {
+    if (button.isConnected) {
+      button.disabled = false;
+      button.textContent = t("account.completePayment");
+    }
   }
 }
 
@@ -2006,9 +2107,15 @@ function setupAuthForms() {
 
   $("#refreshBookings")?.addEventListener("click", () => fetchMyBookings());
   $("#bookingList")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-cancel-booking]");
-    if (!button) return;
-    cancelBooking(button.dataset.cancelBooking, button);
+    const paymentButton = event.target.closest("[data-complete-payment]");
+    if (paymentButton) {
+      completePayment(paymentButton.dataset.completePayment, paymentButton);
+      return;
+    }
+
+    const cancelButton = event.target.closest("[data-cancel-booking]");
+    if (!cancelButton) return;
+    cancelBooking(cancelButton.dataset.cancelBooking, cancelButton);
   });
 }
 
