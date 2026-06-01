@@ -59,3 +59,8 @@ test("expired auth does not hide the login and register forms on first load", ()
   assert.match(dom, /clearStoredAuth\(\);[\s\S]*?return null;/);
   assert.match(dom, /response\.status === 401[\s\S]*?updateAccountSummary\(null\)/);
 });
+
+test("account login and register UI is not hidden by scroll reveal animations", () => {
+  assert.doesNotMatch(dom, /gsap\.utils\.toArray\([^)]*account-copy/);
+  assert.doesNotMatch(dom, /gsap\.utils\.toArray\([^)]*auth-shell/);
+});
