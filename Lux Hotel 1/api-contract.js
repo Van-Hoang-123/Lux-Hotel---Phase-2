@@ -11,20 +11,47 @@
     return String(value).padStart(2, "0");
   }
 
+  const shortMonths = {
+    jan: "01",
+    feb: "02",
+    mar: "03",
+    apr: "04",
+    may: "05",
+    jun: "06",
+    jul: "07",
+    aug: "08",
+    sep: "09",
+    oct: "10",
+    nov: "11",
+    dec: "12",
+  };
+
   function formatDateForApi(value) {
     if (!value) return "";
     const raw = String(value).trim();
     const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (isoMatch) {
-      return `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
-    }
-    if (/^\d{2}-\d{2}-\d{4}$/.test(raw)) {
       return raw;
+    }
+    const backendMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (backendMatch) {
+      return `${backendMatch[3]}-${backendMatch[2]}-${backendMatch[1]}`;
+    }
+    const displayMatch = raw.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+    if (displayMatch && shortMonths[displayMatch[2].toLowerCase()]) {
+      return `${displayMatch[3]}-${shortMonths[displayMatch[2].toLowerCase()]}-${displayMatch[1]}`;
     }
 
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return raw;
-    return `${padDatePart(date.getDate())}-${padDatePart(date.getMonth() + 1)}-${date.getFullYear()}`;
+    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+  }
+
+  function formatDateForLegacyApi(value) {
+    const isoValue = formatDateForApi(value);
+    const isoMatch = isoValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!isoMatch) return isoValue;
+    return `${isoMatch[3]}-${isoMatch[2]}-${isoMatch[1]}`;
   }
 
   function readItems(data) {
@@ -35,12 +62,13 @@
     return [];
   }
 
-  function buildAvailabilityPayload({ arrivalDate, departureDate, adultCount, childCount }) {
+  function buildAvailabilityPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }) {
     return {
+      roomId: Number(roomId),
       arrivalDate: formatDateForApi(arrivalDate),
       departureDate: formatDateForApi(departureDate),
-      adult: Number(adultCount),
-      children: Number(childCount),
+      adultCount: Number(adultCount),
+      childCount: Number(childCount),
     };
   }
 
@@ -49,16 +77,16 @@
       roomId: Number(roomId),
       arrivalDate: formatDateForApi(arrivalDate),
       departureDate: formatDateForApi(departureDate),
-      adult: Number(adultCount),
-      children: Number(childCount),
+      adultCount: Number(adultCount),
+      childCount: Number(childCount),
     };
   }
 
   function buildLegacyAvailabilityPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }) {
     return {
       roomId: Number(roomId),
-      arrivalDate,
-      departureDate,
+      arrivalDate: formatDateForLegacyApi(arrivalDate),
+      departureDate: formatDateForLegacyApi(departureDate),
       adults: Number(adultCount),
       adult: Number(adultCount),
       adultCount: Number(adultCount),
@@ -67,11 +95,15 @@
     };
   }
 
+  const buildLegacyBookingPayload = buildLegacyAvailabilityPayload;
+
   return {
     buildAvailabilityPayload,
     buildBookingPayload,
+    buildLegacyBookingPayload,
     buildLegacyAvailabilityPayload,
     formatDateForApi,
+    formatDateForLegacyApi,
     readItems,
   };
 });

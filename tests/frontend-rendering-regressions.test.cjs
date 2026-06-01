@@ -22,8 +22,10 @@ test("journal article images are not delayed by lazy loading or content visibili
 test("date inputs use a stable display layer instead of native date text", () => {
   assert.match(html, /class="date-control"[\s\S]*id="arrivalDate"[\s\S]*data-date-display-for="arrivalDate"/);
   assert.match(html, /class="date-control"[\s\S]*id="departureDate"[\s\S]*data-date-display-for="departureDate"/);
-  assert.match(css, /\.date-control input\[type="date"\][\s\S]*opacity: 0;/);
+  assert.match(css, /\.date-control input\[type="date"\][\s\S]*opacity: 1;/);
+  assert.match(css, /::-webkit-calendar-picker-indicator[\s\S]*opacity: 0;/);
   assert.match(dom, /function updateDateDisplay\(input\)/);
+  assert.match(dom, /showPicker/);
 });
 
 test("frontend exposes the user booking controller actions", () => {
