@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LuxHotel.Api\LuxHotel.Api.csproj" />
     <ProjectReference Include="..\..\src\LuxHotel.Application\LuxHotel.Application.csproj" />
     <ProjectReference Include="..\..\src\LuxHotel.Domain\LuxHotel.Domain.csproj" />
   </ItemGroup>

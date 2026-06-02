@@ -14,7 +14,7 @@ public class AntiXssMiddleware
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
             "font-src 'self' data: https://fonts.gstatic.com; " +
             "img-src 'self' data: https:; " +
-            "connect-src 'self'; " +
+            "connect-src 'self' ws: wss:; " +
             "base-uri 'self'; " +
             "object-src 'none'; " +
             "frame-ancestors 'none'";

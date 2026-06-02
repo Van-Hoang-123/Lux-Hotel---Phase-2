@@ -1,8 +1,10 @@
-﻿using LuxHotel.Application.Dtos;
+﻿using LuxHotel.Api.Hubs;
+using LuxHotel.Application.Dtos;
 using LuxHotel.Domain.Entities;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -13,10 +15,34 @@ namespace LuxHotel.Api.Controllers
     public class BookingsController : ControllerBase
     {
         private readonly LuxHotelDbContext _context;
+        private readonly IHubContext<BookingHub> _bookingHub;
+        private readonly ILogger<BookingsController> _logger;
 
-        public BookingsController(LuxHotelDbContext context)
+        public BookingsController(
+            LuxHotelDbContext context,
+            IHubContext<BookingHub> bookingHub,
+            ILogger<BookingsController> logger)
         {
             _context = context;
+            _bookingHub = bookingHub;
+            _logger = logger;
+        }
+
+        private async Task NotifyBookingChangedAsync(Guid bookingId, string action)
+        {
+            try
+            {
+                await _bookingHub.Clients.All.SendAsync("bookingChanged", new
+                {
+                    bookingId,
+                    action,
+                    updatedAt = DateTime.UtcNow
+                });
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Could not broadcast booking change for {BookingId}.", bookingId);
+            }
         }
 
         [HttpPost("/api/bookings/check-availability")]
@@ -141,6 +167,7 @@ namespace LuxHotel.Api.Controllers
 
                 // Lưu thành công cả 2 bảng mới Commit
                 await transaction.CommitAsync();
+                await NotifyBookingChangedAsync(newBooking.Id, "created");
 
                 var responseDto = new BookingResponseDTO
                 {
@@ -316,6 +343,7 @@ namespace LuxHotel.Api.Controllers
             // Cập nhật trạng thái
             booking.BookingStatus = "Cancelled";
             await _context.SaveChangesAsync();
+            await NotifyBookingChangedAsync(booking.Id, "cancelled");
 
             return Ok(new { message = "Booking has been cancelled successfully." });
         }
@@ -354,6 +382,7 @@ namespace LuxHotel.Api.Controllers
 
 
             await _context.SaveChangesAsync();
+            await NotifyBookingChangedAsync(booking.Id, "checkedOut");
 
             return Ok(new { message = "Guest has successfully checked out. The room is now available." });
         }
@@ -381,6 +410,7 @@ namespace LuxHotel.Api.Controllers
 
 
             await _context.SaveChangesAsync();
+            await NotifyBookingChangedAsync(payment.BookingId, "paymentCompleted");
 
             return Ok(new
             {

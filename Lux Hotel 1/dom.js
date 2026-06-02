@@ -33,9 +33,9 @@ const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
-const bookingRefreshMs = {
-  admin: 5000,
-  user: 18000,
+const bookingFallbackRefreshMs = {
+  admin: 30000,
+  user: 45000,
 };
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
@@ -49,7 +49,8 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
 let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
-let bookingRefreshTimer = 0;
+let bookingFallbackRefreshTimer = 0;
+let bookingRealtimeConnection = null;
 let bookingRefreshInFlight = false;
 let lastBookingsSignature = "";
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -248,6 +249,7 @@ const translations = {
     "account.loggedOut": "Logged out.",
     "account.myBookingsLabel": "Bookings",
     "account.myBookings": "My bookings",
+    "account.userBookings": "User's bookings",
     "account.refreshBookings": "Refresh",
     "account.loadingBookings": "Loading bookings...",
     "account.noBookings": "No bookings yet.",
@@ -421,6 +423,7 @@ const translations = {
     "account.loggedOut": "Đã đăng xuất.",
     "account.myBookingsLabel": "Booking",
     "account.myBookings": "Booking của tôi",
+    "account.userBookings": "Booking của user",
     "account.refreshBookings": "Tải lại",
     "account.loadingBookings": "Đang tải booking...",
     "account.noBookings": "Chưa có booking nào.",
@@ -1386,12 +1389,20 @@ function renderAdminBookingGuest(booking, auth) {
   `;
 }
 
+function updateBookingHistoryTitle(auth = getStoredAuth()) {
+  const title = $("#bookingHistoryTitle");
+  if (!title) return;
+
+  title.textContent = t(userHasRole(auth, "Admin") ? "account.userBookings" : "account.myBookings");
+}
+
 function renderBookingHistory(message = "") {
   const history = $("#bookingHistory");
   const list = $("#bookingList");
   if (!history || !list) return;
 
   const auth = getStoredAuth();
+  updateBookingHistoryTitle(auth);
   history.hidden = !auth?.token;
   if (!auth?.token) {
     list.innerHTML = "";
@@ -1532,27 +1543,76 @@ async function fetchMyBookings({ silent = false } = {}) {
   }
 }
 
+function buildBookingHubUrl() {
+  const normalizedApiBase = normalizeApiBase(apiBaseUrl);
+  if (!normalizedApiBase || normalizedApiBase === "/api") return "/hubs/bookings";
+
+  return normalizedApiBase.endsWith("/api")
+    ? `${normalizedApiBase.slice(0, -4)}/hubs/bookings`
+    : `${normalizedApiBase}/hubs/bookings`;
+}
+
+async function refreshBookingsSilently() {
+  if (document.hidden || bookingRefreshInFlight) return;
+
+  bookingRefreshInFlight = true;
+  try {
+    await fetchMyBookings({ silent: true });
+  } finally {
+    bookingRefreshInFlight = false;
+  }
+}
+
+function startBookingFallbackRefresh(auth = getStoredAuth()) {
+  if (!auth?.token) return;
+
+  const interval = userHasRole(auth, "Admin") ? bookingFallbackRefreshMs.admin : bookingFallbackRefreshMs.user;
+  bookingFallbackRefreshTimer = window.setInterval(refreshBookingsSilently, interval);
+}
+
+async function startBookingRealtime(auth = getStoredAuth()) {
+  if (!auth?.token || !window.signalR) return;
+
+  const connection = new window.signalR.HubConnectionBuilder()
+    .withUrl(buildBookingHubUrl(), {
+      accessTokenFactory: () => getStoredAuth()?.token || auth.token || "",
+    })
+    .withAutomaticReconnect()
+    .build();
+
+  bookingRealtimeConnection = connection;
+  connection.on("bookingChanged", refreshBookingsSilently);
+  connection.onreconnected(refreshBookingsSilently);
+  connection.onclose(() => {
+    if (bookingRealtimeConnection === connection) bookingRealtimeConnection = null;
+  });
+
+  try {
+    await connection.start();
+    await refreshBookingsSilently();
+  } catch (error) {
+    console.warn("Booking realtime connection failed; using fallback refresh.", error);
+    if (bookingRealtimeConnection === connection) bookingRealtimeConnection = null;
+  }
+}
+
 function stopBookingAutoRefresh() {
-  if (!bookingRefreshTimer) return;
-  window.clearInterval(bookingRefreshTimer);
-  bookingRefreshTimer = 0;
+  if (bookingFallbackRefreshTimer) {
+    window.clearInterval(bookingFallbackRefreshTimer);
+    bookingFallbackRefreshTimer = 0;
+  }
+
+  const connection = bookingRealtimeConnection;
+  bookingRealtimeConnection = null;
+  if (connection) connection.stop().catch(() => {});
 }
 
 function startBookingAutoRefresh(auth = getStoredAuth()) {
   stopBookingAutoRefresh();
   if (!auth?.token) return;
 
-  const interval = userHasRole(auth, "Admin") ? bookingRefreshMs.admin : bookingRefreshMs.user;
-  bookingRefreshTimer = window.setInterval(async () => {
-    if (document.hidden || bookingRefreshInFlight) return;
-
-    bookingRefreshInFlight = true;
-    try {
-      await fetchMyBookings({ silent: true });
-    } finally {
-      bookingRefreshInFlight = false;
-    }
-  }, interval);
+  startBookingRealtime(auth);
+  startBookingFallbackRefresh(auth);
 }
 
 function setupBookingAutoRefresh() {
@@ -1560,8 +1620,8 @@ function setupBookingAutoRefresh() {
     const auth = getStoredAuth();
     if (!auth?.token || document.hidden) return;
 
-    startBookingAutoRefresh(auth);
-    fetchMyBookings({ silent: true });
+    if (!bookingRealtimeConnection) startBookingRealtime(auth);
+    refreshBookingsSilently();
   });
 }
 
@@ -1988,6 +2048,8 @@ function updateAccountSummary(auth = getStoredAuth()) {
   const panels = $$("[data-auth-panel]");
   if (!summary || !logoutButton) return;
 
+  updateBookingHistoryTitle(auth);
+
   const user = auth?.user;
   if (auth?.token) {
     const name = getDisplayName(user);
@@ -2338,6 +2400,7 @@ function setupAuthForms() {
   });
 
   $("#logoutButton").addEventListener("click", () => {
+    stopBookingAutoRefresh();
     clearStoredAuth();
     myBookings = [];
     lastBookingsSignature = "";

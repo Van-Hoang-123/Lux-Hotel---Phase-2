@@ -70,14 +70,28 @@ test("admin booking list shows the guest identity returned by the booking API", 
   assert.match(css, /\.booking-guest-info/);
 });
 
-test("admin bookings refresh automatically without manual reload", () => {
-  assert.match(dom, /const bookingRefreshMs = \{[\s\S]*admin: 5000/);
+test("admin bookings refresh through SignalR without manual reload", () => {
+  assert.match(html, /@microsoft\/signalr@9\.0\.6/);
+  assert.match(dom, /function buildBookingHubUrl\(\)/);
+  assert.match(dom, /\/hubs\/bookings/);
+  assert.match(dom, /new window\.signalR\.HubConnectionBuilder\(\)/);
+  assert.match(dom, /\.withAutomaticReconnect\(\)/);
+  assert.match(dom, /connection\.on\("bookingChanged", refreshBookingsSilently\)/);
+  assert.match(dom, /const bookingFallbackRefreshMs = \{[\s\S]*admin: 30000/);
   assert.match(dom, /function startBookingAutoRefresh\(auth = getStoredAuth\(\)\)/);
-  assert.match(dom, /userHasRole\(auth, "Admin"\) \? bookingRefreshMs\.admin : bookingRefreshMs\.user/);
-  assert.match(dom, /window\.setInterval\(async \(\) => \{/);
+  assert.match(dom, /startBookingRealtime\(auth\)/);
+  assert.match(dom, /userHasRole\(auth, "Admin"\) \? bookingFallbackRefreshMs\.admin : bookingFallbackRefreshMs\.user/);
   assert.match(dom, /fetchMyBookings\(\{ silent: true \}\)/);
   assert.match(dom, /document\.addEventListener\("visibilitychange"/);
   assert.match(dom, /function bookingListSignature\(bookings\)/);
+});
+
+test("admin account labels user bookings separately from personal bookings", () => {
+  assert.match(html, /id="bookingHistoryTitle"[\s\S]*data-i18n="account\.myBookings"/);
+  assert.match(dom, /"account\.userBookings": "User's bookings"/);
+  assert.match(dom, /"account\.userBookings": "Booking của user"/);
+  assert.match(dom, /function updateBookingHistoryTitle\(auth = getStoredAuth\(\)\)/);
+  assert.match(dom, /userHasRole\(auth, "Admin"\) \? "account\.userBookings" : "account\.myBookings"/);
 });
 
 test("booking form shows a price preview before creating a booking", () => {

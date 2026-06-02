@@ -1,5 +1,6 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using LuxHotel.Api.Hubs;
 using LuxHotel.Api.Middleware;
 using LuxHotel.Application.Security.Interfaces;
 using LuxHotel.Application.Security.Services;
@@ -63,6 +64,21 @@ builder.Services
     {
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.SaveToken = true;
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"].ToString();
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrWhiteSpace(accessToken) && path.StartsWithSegments("/hubs/bookings"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -97,6 +113,7 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Strict;
 });
 
+builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -174,6 +191,7 @@ if (Directory.Exists(frontendRoot))
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<BookingHub>("/hubs/bookings");
 
 app.MapFallback(async context =>
 {
