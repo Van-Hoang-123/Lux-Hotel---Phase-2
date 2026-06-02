@@ -54,6 +54,15 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(css, /\.booking-item-actions \.payment-action/);
 });
 
+test("admin booking list shows the guest identity returned by the booking API", () => {
+  assert.match(dom, /guestFullName: firstValue\(/);
+  assert.match(dom, /guestEmail: firstValue\(/);
+  assert.match(dom, /function renderAdminBookingGuest\(booking, auth\)/);
+  assert.match(dom, /userHasRole\(auth, "Admin"\)/);
+  assert.match(dom, /booking-guest-info/);
+  assert.match(css, /\.booking-guest-info/);
+});
+
 test("expired auth does not hide the login and register forms on first load", () => {
   assert.match(dom, /function isAuthExpired\(auth\)/);
   assert.match(dom, /clearStoredAuth\(\);[\s\S]*?return null;/);

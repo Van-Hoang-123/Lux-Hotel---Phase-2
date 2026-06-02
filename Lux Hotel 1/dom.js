@@ -248,6 +248,8 @@ const translations = {
     "account.paymentStatus": "Payment: {{status}}",
     "account.paymentPending": "Pending",
     "account.paymentCompletedStatus": "Completed",
+    "account.bookingGuestLabel": "Guest",
+    "account.bookingUserId": "User ID: {{id}}",
     "account.bookingDates": "{{arrival}} to {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Total: {{total}}",
@@ -412,6 +414,8 @@ const translations = {
     "account.paymentStatus": "Thanh toán: {{status}}",
     "account.paymentPending": "Chờ thanh toán",
     "account.paymentCompletedStatus": "Đã thanh toán",
+    "account.bookingGuestLabel": "Khách",
+    "account.bookingUserId": "Mã user: {{id}}",
     "account.bookingDates": "{{arrival}} đến {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Tổng: {{total}}",
@@ -1281,10 +1285,25 @@ function isPaymentCompleted(value) {
 
 function normalizeBooking(booking = {}) {
   const payment = booking.payment || booking.Payment || {};
+  const user = booking.user || booking.User || booking.guest || booking.Guest || {};
   return {
     id: String(booking.id || booking.Id || ""),
     roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
     roomTitle: firstValue(booking.roomTitle, booking.RoomTitle, booking.roomName, booking.RoomName),
+    userId: String(firstValue(booking.userId, booking.UserId, user.id, user.Id) || ""),
+    guestFullName: firstValue(
+      booking.guestFullName,
+      booking.GuestFullName,
+      booking.fullName,
+      booking.FullName,
+      user.fullName,
+      user.FullName,
+      user.name,
+      user.Name,
+      user.userName,
+      user.UserName
+    ),
+    guestEmail: firstValue(booking.guestEmail, booking.GuestEmail, booking.email, booking.Email, user.email, user.Email),
     arrivalDate: toDateInputLike(booking.arrivalDate || booking.ArrivalDate || ""),
     departureDate: toDateInputLike(booking.departureDate || booking.DepartureDate || ""),
     adult: Number(booking.adultCount ?? booking.AdultCount ?? booking.adult ?? booking.Adult ?? booking.adults ?? booking.Adults ?? 1),
@@ -1311,6 +1330,29 @@ function canCompletePayment(booking) {
     ["Confirmed", "Pending"].includes(booking.status) &&
     !isPaymentCompleted(booking.paymentStatus)
   );
+}
+
+function renderAdminBookingGuest(booking, auth) {
+  if (!userHasRole(auth, "Admin")) return "";
+
+  const guestName = firstValue(booking.guestFullName, booking.guestEmail, booking.userId);
+  if (!guestName) return "";
+
+  const guestEmailMarkup = booking.guestEmail && booking.guestEmail !== guestName
+    ? `<small>${escapeHtml(booking.guestEmail)}</small>`
+    : "";
+  const userIdMarkup = booking.userId && booking.userId !== booking.guestEmail
+    ? `<small>${escapeHtml(t("account.bookingUserId", { id: booking.userId }))}</small>`
+    : "";
+
+  return `
+    <div class="booking-guest-info">
+      <span>${escapeHtml(t("account.bookingGuestLabel"))}</span>
+      <strong>${escapeHtml(guestName)}</strong>
+      ${guestEmailMarkup}
+      ${userIdMarkup}
+    </div>
+  `;
 }
 
 function renderBookingHistory(message = "") {
@@ -1345,6 +1387,7 @@ function renderBookingHistory(message = "") {
       const paymentStatusMarkup = paymentStatus
         ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
         : "";
+      const guestInfoMarkup = renderAdminBookingGuest(booking, auth);
       const paymentActionMarkup = canCompletePayment(booking)
         ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
         : "";
@@ -1360,6 +1403,7 @@ function renderBookingHistory(message = "") {
             </div>
             <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
           </div>
+          ${guestInfoMarkup}
           <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
           <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
           ${paymentStatusMarkup}
