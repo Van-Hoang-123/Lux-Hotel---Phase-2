@@ -31,9 +31,14 @@ test("date inputs use a stable display layer instead of native date text", () =>
 test("frontend exposes the user booking controller actions", () => {
   assert.match(html, /id="bookRoomButton"[\s\S]*data-i18n="booking\.bookSelected"/);
   assert.match(html, /id="bookingHistory"[\s\S]*id="bookingList"/);
+  assert.match(html, /id="cancelBookingConfirm"[\s\S]*Are you sure you want to cancel booking\?/);
+  assert.match(html, /data-cancel-booking-confirm-yes[\s\S]*YES/);
+  assert.match(html, /data-cancel-booking-confirm-no[\s\S]*NO/);
   assert.match(dom, /apiFetch\("\/bookings"/);
   assert.match(dom, /apiFetch\("\/bookings\/my"/);
+  assert.match(dom, /function openCancelBookingConfirm\(bookingId, button\)/);
   assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/cancel/);
+  assert.match(dom, /openCancelBookingConfirm\(cancelButton\.dataset\.cancelBooking, cancelButton\)/);
   assert.match(dom, /method: "DELETE"[\s\S]*returnStatuses: \[400, 401, 403, 404, 405\]/);
   assert.match(dom, /function canCancelBooking\(booking\)[\s\S]*booking\.status === "Confirmed"/);
   assert.match(dom, /buildBookingPayload/);

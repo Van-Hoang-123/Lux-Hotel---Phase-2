@@ -356,6 +356,17 @@
       </figure>
     </div>
 
+    <div class="confirm-modal" id="cancelBookingConfirm" role="dialog" aria-modal="true" aria-labelledby="cancelBookingConfirmTitle" aria-hidden="true">
+      <button class="confirm-backdrop" type="button" data-cancel-booking-confirm-no aria-label="No" data-i18n-aria="account.cancelBookingNo"></button>
+      <article class="confirm-card">
+        <h2 id="cancelBookingConfirmTitle" data-i18n="account.cancelBookingConfirm">Are you sure you want to cancel booking?</h2>
+        <div class="confirm-actions">
+          <button class="confirm-action confirm-action-yes" type="button" data-cancel-booking-confirm-yes data-i18n="account.cancelBookingYes">YES</button>
+          <button class="confirm-action confirm-action-no" type="button" data-cancel-booking-confirm-no data-i18n="account.cancelBookingNo">NO</button>
+        </div>
+      </article>
+    </div>
+
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
     <script

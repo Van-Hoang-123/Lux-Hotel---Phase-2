@@ -45,6 +45,7 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
 let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
+let pendingCancelBooking = null;
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
   prefersReducedMotion ||
@@ -237,6 +238,9 @@ const translations = {
     "account.cancelBooking": "Cancel booking",
     "account.canceling": "Canceling...",
     "account.cancelled": "Booking cancelled.",
+    "account.cancelBookingConfirm": "Are you sure you want to cancel booking?",
+    "account.cancelBookingYes": "YES",
+    "account.cancelBookingNo": "NO",
     "account.bookingCancelFailed": "Could not cancel this booking.",
     "account.completePayment": "Complete payment",
     "account.completingPayment": "Completing...",
@@ -1429,6 +1433,27 @@ async function fetchMyBookings({ silent = false } = {}) {
   }
 }
 
+function closeCancelBookingConfirm() {
+  const modal = $("#cancelBookingConfirm");
+  if (!modal) return;
+
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  pendingCancelBooking = null;
+}
+
+function openCancelBookingConfirm(bookingId, button) {
+  const modal = $("#cancelBookingConfirm");
+  if (!modal || !bookingId || !button) return;
+
+  pendingCancelBooking = { bookingId, button };
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  modal.querySelector("[data-cancel-booking-confirm-yes]")?.focus();
+}
+
 async function cancelBooking(bookingId, button) {
   if (!bookingId || !button) return;
 
@@ -2208,7 +2233,27 @@ function setupAuthForms() {
 
     const cancelButton = event.target.closest("[data-cancel-booking]");
     if (!cancelButton) return;
-    cancelBooking(cancelButton.dataset.cancelBooking, cancelButton);
+    openCancelBookingConfirm(cancelButton.dataset.cancelBooking, cancelButton);
+  });
+
+  $("#cancelBookingConfirm")?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-cancel-booking-confirm-no]")) {
+      closeCancelBookingConfirm();
+      return;
+    }
+
+    if (event.target.closest("[data-cancel-booking-confirm-yes]")) {
+      const cancelRequest = pendingCancelBooking;
+      closeCancelBookingConfirm();
+      if (cancelRequest) cancelBooking(cancelRequest.bookingId, cancelRequest.button);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const modal = $("#cancelBookingConfirm");
+    if (event.key === "Escape" && modal?.classList.contains("is-open")) {
+      closeCancelBookingConfirm();
+    }
   });
 }
 
