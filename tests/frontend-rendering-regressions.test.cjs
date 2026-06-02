@@ -47,6 +47,7 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(dom, /data-complete-payment/);
   assert.match(dom, /account\.paymentUnavailable/);
   assert.match(dom, /let paymentApiAvailable = false/);
+  assert.match(dom, /function canCompletePayment\(booking\)[\s\S]*paymentApiAvailable/);
   assert.match(dom, /userHasRole\(getStoredAuth\(\), "Admin"\)/);
   assert.match(dom, /\["Confirmed", "Pending"\]\.includes\(booking\.status\)/);
   assert.match(dom, /const bookingPath = userHasRole\(auth, "Admin"\) \? "\/bookings" : "\/bookings\/my"/);
@@ -61,6 +62,15 @@ test("admin booking list shows the guest identity returned by the booking API", 
   assert.match(dom, /userHasRole\(auth, "Admin"\)/);
   assert.match(dom, /booking-guest-info/);
   assert.match(css, /\.booking-guest-info/);
+});
+
+test("booking form shows a price preview before creating a booking", () => {
+  assert.match(html, /id="bookingPricePreview"[\s\S]*id="bookingPriceValue"[\s\S]*id="bookingPriceHint"/);
+  assert.match(dom, /function updateBookingPricePreview\(\)/);
+  assert.match(dom, /function stayNightCount\(arrival, departure\)/);
+  assert.match(dom, /roomNightlyPriceValue\(room\)/);
+  assert.match(dom, /updateBookingPricePreview\(\);/);
+  assert.match(css, /\.booking-price-preview/);
 });
 
 test("expired auth does not hide the login and register forms on first load", () => {

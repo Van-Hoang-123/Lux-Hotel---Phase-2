@@ -528,7 +528,7 @@ h1 {
 
 .booking-form {
     display: grid;
-    grid-template-columns: minmax(190px, 1.25fr) repeat(4, minmax(150px, 1fr)) minmax(160px, auto);
+    grid-template-columns: minmax(170px, 1.12fr) repeat(4, minmax(128px, 0.92fr)) minmax(118px, 0.7fr) minmax(158px, auto);
     gap: 16px;
     align-items: end;
     border: 1px solid var(--line);
@@ -567,6 +567,41 @@ h1 {
     text-overflow: ellipsis;
     text-transform: uppercase;
     white-space: nowrap;
+}
+
+.booking-price-preview {
+    min-height: 48px;
+    display: grid;
+    align-self: end;
+    align-content: center;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: var(--input-bg);
+}
+
+.booking-price-preview span {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.15;
+    text-transform: uppercase;
+}
+
+.booking-price-preview strong {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 20px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.booking-price-preview small {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 input,

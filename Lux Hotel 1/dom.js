@@ -156,6 +156,10 @@ const translations = {
     "booking.arrivalDate": "Arrival date",
     "booking.departureDate": "Departure date",
     "booking.selectDate": "Select date",
+    "booking.pricePreviewLabel": "Price",
+    "booking.pricePreviewDateHint": "Select dates",
+    "booking.pricePreviewNight": "{{count}} night",
+    "booking.pricePreviewNight_plural": "{{count}} nights",
     "booking.checking": "Checking...",
     "booking.booking": "Booking...",
     "booking.availableFallback": "Room is available.",
@@ -322,6 +326,10 @@ const translations = {
     "booking.arrivalDate": "Ngày đến",
     "booking.departureDate": "Ngày đi",
     "booking.selectDate": "Chọn ngày",
+    "booking.pricePreviewLabel": "Giá",
+    "booking.pricePreviewDateHint": "Chọn ngày",
+    "booking.pricePreviewNight": "{{count}} đêm",
+    "booking.pricePreviewNight_plural": "{{count}} đêm",
     "booking.checking": "Đang kiểm tra...",
     "booking.booking": "Đang đặt...",
     "booking.availableFallback": "Phòng còn trống.",
@@ -1159,6 +1167,7 @@ function renderRoomOptions() {
   if (!rooms.length) {
     selectedRoomId = 0;
     select.innerHTML = `<option value="">${escapeHtml(t("rooms.empty"))}</option>`;
+    updateBookingPricePreview();
     return;
   }
 
@@ -1175,6 +1184,7 @@ function renderRoomOptions() {
       `;
     })
     .join("");
+  updateBookingPricePreview();
 }
 
 function renderRooms() {
@@ -1325,6 +1335,7 @@ function canCancelBooking(booking) {
 
 function canCompletePayment(booking) {
   return (
+    paymentApiAvailable &&
     userHasRole(getStoredAuth(), "Admin") &&
     Boolean(booking.id) &&
     ["Confirmed", "Pending"].includes(booking.status) &&
@@ -2081,6 +2092,48 @@ function updateDateDisplays() {
   $$("input[type='date']").forEach(updateDateDisplay);
 }
 
+function stayNightCount(arrival, departure) {
+  if (!arrival || !departure) return 0;
+
+  const arrivalDate = new Date(`${arrival}T00:00:00`);
+  const departureDate = new Date(`${departure}T00:00:00`);
+  if (Number.isNaN(arrivalDate.getTime()) || Number.isNaN(departureDate.getTime())) return 0;
+
+  const nights = Math.round((departureDate - arrivalDate) / 86_400_000);
+  return nights > 0 ? nights : 0;
+}
+
+function roomNightlyPriceValue(room) {
+  const numericPrice = Number(
+    room?.priceValue ?? room?.nightlyPrice ?? room?.NightlyPrice ?? room?.pricePerNight ?? room?.PricePerNight ?? room?.Price
+  );
+  if (Number.isFinite(numericPrice) && numericPrice > 0) return numericPrice;
+
+  const priceText = String(firstValue(room?.price, room?.priceVi, room?.Price, room?.PriceVi) || "");
+  const match = priceText.match(/\d+(?:[,.]\d+)*/);
+  if (!match) return 0;
+
+  const parsed = Number(match[0].replaceAll(",", ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function updateBookingPricePreview() {
+  const value = $("#bookingPriceValue");
+  const hint = $("#bookingPriceHint");
+  if (!value || !hint) return;
+
+  const { arrival, departure, roomId } = readBookingFormValues();
+  const room = findRoomById(roomId) || rooms[0] || allRooms[0];
+  const nightlyPrice = roomNightlyPriceValue(room);
+  const nights = stayNightCount(arrival, departure);
+  const total = nightlyPrice * Math.max(nights, 1);
+
+  value.textContent = total > 0 ? formatMoney(total) : "--";
+  hint.textContent = nights > 0
+    ? t(nights === 1 ? "booking.pricePreviewNight" : "booking.pricePreviewNight_plural", { count: nights })
+    : t("booking.pricePreviewDateHint");
+}
+
 function openNativeDatePicker(input) {
   if (!input) return;
   input.focus({ preventScroll: true });
@@ -2362,22 +2415,28 @@ function setupForms() {
   roomSelect.addEventListener("change", () => {
     selectedRoomId = Number(roomSelect.value || rooms[0]?.id || 1);
     setBookingStatus("", "");
+    updateBookingPricePreview();
   });
 
   ["#arrivalDate", "#departureDate"].forEach((selector) => {
     $(selector).addEventListener("change", (event) => {
       updateDateDisplay(event.currentTarget);
       resetRoomResults();
+      updateBookingPricePreview();
     });
   });
   $("#adult").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount);
     resetRoomResults();
+    updateBookingPricePreview();
   });
   $("#children").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount);
     resetRoomResults();
+    updateBookingPricePreview();
   });
+
+  updateBookingPricePreview();
 
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
