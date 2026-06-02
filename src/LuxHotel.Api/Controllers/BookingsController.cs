@@ -202,6 +202,38 @@ namespace LuxHotel.Api.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [HttpGet("/api/bookings")]
+        public async Task<IActionResult> GetAllBookings()
+        {
+            var bookings = await _context.Bookings
+                .AsNoTracking()
+                .Include(booking => booking.User)
+                .Include(booking => booking.Room)
+                .Include(booking => booking.Payment)
+                .OrderByDescending(booking => booking.CreatedAt)
+                .Select(booking => new
+                {
+                    booking.Id,
+                    booking.UserId,
+                    GuestFullName = booking.User.FullName,
+                    GuestEmail = booking.User.Email,
+                    booking.RoomId,
+                    RoomTitle = booking.Room.RoomType,
+                    booking.ArrivalDate,
+                    booking.DepartureDate,
+                    booking.Adult,
+                    booking.Children,
+                    booking.TotalPrice,
+                    booking.BookingStatus,
+                    PaymentStatus = booking.Payment != null ? booking.Payment.PaymentStatus : null,
+                    PaidAt = booking.Payment != null ? booking.Payment.PaidAt : null
+                })
+                .ToListAsync();
+
+            return Ok(bookings);
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpPatch("/api/toggle-room-status/{id}")]
         public async Task<IActionResult> ToggleRoomAvailableStatus(int id)
         {
