@@ -164,6 +164,29 @@ namespace LuxHotel.Api.Controllers
             }
         }
 
+        [Authorize(Roles = "Admin")]
+        [HttpGet("/api/bookings")]
+        public async Task<IActionResult> GetAllBookings()
+        {
+            var bookings = await _context.Bookings
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(b => new BookingResponseDTO
+                {
+                    Id = b.Id,
+                    RoomId = b.RoomId,
+                    ArrivalDate = b.ArrivalDate,
+                    DepartureDate = b.DepartureDate,
+                    Adult = b.Adult,
+                    Children = b.Children,
+                    TotalPrice = b.TotalPrice,
+                    BookingStatus = b.BookingStatus,
+                })
+                .ToListAsync();
+
+            return Ok(bookings);
+        }
+
         [Authorize(Roles = "User")]
         [HttpGet("/api/bookings/my")]
         public async Task<IActionResult> GetAllMyBookings() // Thêm async Task<>
