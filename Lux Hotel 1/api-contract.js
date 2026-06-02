@@ -65,9 +65,12 @@
   function buildAvailabilityPayload({ roomId, arrivalDate, departureDate, adultCount, childCount }) {
     return {
       roomId: Number(roomId),
-      arrivalDate: formatDateForApi(arrivalDate),
-      departureDate: formatDateForApi(departureDate),
+      arrivalDate: formatDateForLegacyApi(arrivalDate),
+      departureDate: formatDateForLegacyApi(departureDate),
+      adult: Number(adultCount),
+      adults: Number(adultCount),
       adultCount: Number(adultCount),
+      children: Number(childCount),
       childCount: Number(childCount),
     };
   }
@@ -77,9 +80,12 @@
       roomId: Number(roomId),
       guestFullName: String(guestFullName || "").trim(),
       guestEmail: String(guestEmail || "").trim(),
-      arrivalDate: formatDateForApi(arrivalDate),
-      departureDate: formatDateForApi(departureDate),
+      arrivalDate: formatDateForLegacyApi(arrivalDate),
+      departureDate: formatDateForLegacyApi(departureDate),
+      adult: Number(adultCount),
+      adults: Number(adultCount),
       adultCount: Number(adultCount),
+      children: Number(childCount),
       childCount: Number(childCount),
     };
   }

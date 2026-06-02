@@ -73,18 +73,24 @@ function formatDateForLegacyBackend(value) {
 const apiContract = window.LuxApiContract || {
   buildAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
-    arrivalDate: formatDateForBackend(arrivalDate),
-    departureDate: formatDateForBackend(departureDate),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    adults: Number(adultCount),
     adultCount: Number(adultCount),
+    children: Number(childCount),
     childCount: Number(childCount),
   }),
   buildBookingPayload: ({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
     guestFullName: String(guestFullName || "").trim(),
     guestEmail: String(guestEmail || "").trim(),
-    arrivalDate: formatDateForBackend(arrivalDate),
-    departureDate: formatDateForBackend(departureDate),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    adults: Number(adultCount),
     adultCount: Number(adultCount),
+    children: Number(childCount),
     childCount: Number(childCount),
   }),
   buildLegacyAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
