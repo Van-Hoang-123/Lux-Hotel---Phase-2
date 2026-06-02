@@ -12,8 +12,11 @@ test("booking form has a wide tablet breakpoint before the iPad layout squeezes"
   assert.match(css, /@media \(max-width: 1240px\)[\s\S]*?\.booking-form[\s\S]*?repeat\(3, minmax\(0, 1fr\)\)/);
 });
 
-test("journal article images are not delayed by lazy loading or content visibility", () => {
-  assert.match(dom, /<img[\s\S]*?loading="eager"[\s\S]*?>/);
+test("frontend images do not use lazy loading or delayed background observers", () => {
+  assert.doesNotMatch(html, /loading="lazy"/);
+  assert.doesNotMatch(dom, /loading="lazy"/);
+  assert.doesNotMatch(dom, /IntersectionObserver/);
+  assert.match(dom, /function setupBackgroundImages\(root = document\)/);
 
   const contentVisibilityBlock = css.match(/\.intro-section,[\s\S]*?content-visibility: auto;/)?.[0] || "";
   assert.equal(contentVisibilityBlock.includes(".journal-section"), false);
@@ -62,6 +65,16 @@ test("admin booking list shows the guest identity returned by the booking API", 
   assert.match(dom, /userHasRole\(auth, "Admin"\)/);
   assert.match(dom, /booking-guest-info/);
   assert.match(css, /\.booking-guest-info/);
+});
+
+test("admin bookings refresh automatically without manual reload", () => {
+  assert.match(dom, /const bookingRefreshMs = \{[\s\S]*admin: 5000/);
+  assert.match(dom, /function startBookingAutoRefresh\(auth = getStoredAuth\(\)\)/);
+  assert.match(dom, /userHasRole\(auth, "Admin"\) \? bookingRefreshMs\.admin : bookingRefreshMs\.user/);
+  assert.match(dom, /window\.setInterval\(async \(\) => \{/);
+  assert.match(dom, /fetchMyBookings\(\{ silent: true \}\)/);
+  assert.match(dom, /document\.addEventListener\("visibilitychange"/);
+  assert.match(dom, /function bookingListSignature\(bookings\)/);
 });
 
 test("booking form shows a price preview before creating a booking", () => {

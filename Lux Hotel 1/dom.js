@@ -33,6 +33,10 @@ const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
+const bookingRefreshMs = {
+  admin: 5000,
+  user: 18000,
+};
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
@@ -45,6 +49,9 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
 let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
+let bookingRefreshTimer = 0;
+let bookingRefreshInFlight = false;
+let lastBookingsSignature = "";
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
   prefersReducedMotion ||
@@ -674,6 +681,7 @@ function saveAuth(auth) {
 }
 
 function clearStoredAuth() {
+  stopBookingAutoRefresh();
   localStorage.removeItem(authStorageKey);
 }
 
@@ -1206,7 +1214,7 @@ function renderRooms() {
         <article class="room-card">
           <button class="room-card-button" type="button" data-room-index="${index}" aria-label="${escapeHtml(t("rooms.viewDetailsAria", { room: title }))}">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" decoding="async" />
             </div>
             <div class="content">
               <p class="price">${escapeHtml(roomPrice(room))}</p>
@@ -1434,10 +1442,31 @@ function renderBookingHistory(message = "") {
     .join("");
 }
 
+function bookingListSignature(bookings) {
+  return JSON.stringify(
+    bookings.map((booking) => ({
+      id: booking.id,
+      roomId: booking.roomId,
+      userId: booking.userId,
+      guestFullName: booking.guestFullName,
+      guestEmail: booking.guestEmail,
+      arrivalDate: booking.arrivalDate,
+      departureDate: booking.departureDate,
+      adult: booking.adult,
+      children: booking.children,
+      totalPrice: booking.totalPrice,
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      paidAt: booking.paidAt,
+    }))
+  );
+}
+
 async function fetchMyBookings({ silent = false } = {}) {
   const auth = getStoredAuth();
   if (!auth?.token) {
     myBookings = [];
+    lastBookingsSignature = "";
     renderBookingHistory();
     return;
   }
@@ -1467,6 +1496,7 @@ async function fetchMyBookings({ silent = false } = {}) {
       if (response.status === 401) {
         clearStoredAuth();
         myBookings = [];
+        lastBookingsSignature = "";
         updateAccountSummary(null);
         renderBookingHistory();
         setAuthStatus("warning", t("booking.signInRequired"));
@@ -1474,20 +1504,59 @@ async function fetchMyBookings({ silent = false } = {}) {
       }
 
       myBookings = [];
+      lastBookingsSignature = "";
       renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
       return;
     }
 
-    myBookings = apiContract
+    const nextBookings = apiContract
       .readItems(data)
       .map(normalizeBooking)
       .filter((booking) => booking.id);
-    renderBookingHistory();
+    const nextSignature = bookingListSignature(nextBookings);
+    const hasChanged = nextSignature !== lastBookingsSignature;
+    myBookings = nextBookings;
+    lastBookingsSignature = nextSignature;
+    if (!silent || hasChanged) renderBookingHistory();
   } catch (error) {
     console.error("My bookings API error:", error);
     myBookings = [];
+    lastBookingsSignature = "";
     renderBookingHistory(t("account.bookingLoadFailed"));
   }
+}
+
+function stopBookingAutoRefresh() {
+  if (!bookingRefreshTimer) return;
+  window.clearInterval(bookingRefreshTimer);
+  bookingRefreshTimer = 0;
+}
+
+function startBookingAutoRefresh(auth = getStoredAuth()) {
+  stopBookingAutoRefresh();
+  if (!auth?.token) return;
+
+  const interval = userHasRole(auth, "Admin") ? bookingRefreshMs.admin : bookingRefreshMs.user;
+  bookingRefreshTimer = window.setInterval(async () => {
+    if (document.hidden || bookingRefreshInFlight) return;
+
+    bookingRefreshInFlight = true;
+    try {
+      await fetchMyBookings({ silent: true });
+    } finally {
+      bookingRefreshInFlight = false;
+    }
+  }, interval);
+}
+
+function setupBookingAutoRefresh() {
+  document.addEventListener("visibilitychange", () => {
+    const auth = getStoredAuth();
+    if (!auth?.token || document.hidden) return;
+
+    startBookingAutoRefresh(auth);
+    fetchMyBookings({ silent: true });
+  });
 }
 
 async function cancelBooking(bookingId, button) {
@@ -1597,7 +1666,7 @@ function renderReviews() {
       (review) => `
         <article class="review-card">
           <header>
-            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" fetchpriority="low" />
+            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" decoding="async" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
               <p>${escapeHtml(t("common.verifiedGuest"))}</p>
@@ -1615,7 +1684,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="eager" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" decoding="async" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>
@@ -1633,7 +1702,7 @@ function renderGallery() {
       const title = localized(item, "title");
       return `
         <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="${escapeHtml(t("gallery.openAria", { title }))}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" decoding="async" />
           <span>
             <small>${escapeHtml(localized(item, "kicker"))}</small>
             <strong>${escapeHtml(title)}</strong>
@@ -1644,57 +1713,18 @@ function renderGallery() {
     .join("");
 }
 
-function setupLazyBackgrounds(root = document) {
+function setupBackgroundImages(root = document) {
   const cards = $$("[data-bg]", root);
   if (!cards.length) return;
 
-  const runWhenIdle = (callback) => {
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(callback, { timeout: 900 });
-      return;
-    }
-
-    window.setTimeout(callback, 80);
-  };
-
-  const loadBackground = (card) => {
+  cards.forEach((card) => {
     const image = card.dataset.bg;
-    if (!image || card.classList.contains("is-bg-loading")) return;
+    if (!image) return;
 
-    card.classList.add("is-bg-loading");
-    const loader = new Image();
-    loader.decoding = "async";
-    loader.onload = () => {
-      runWhenIdle(() => {
-        card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
-        card.classList.add("is-bg-loaded");
-        card.removeAttribute("data-bg");
-      });
-    };
-    loader.onerror = () => {
-      card.classList.remove("is-bg-loading");
-      card.removeAttribute("data-bg");
-    };
-    loader.src = image;
-  };
-
-  if (!("IntersectionObserver" in window)) {
-    cards.forEach(loadBackground);
-    return;
-  }
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        loadBackground(entry.target);
-        observer.unobserve(entry.target);
-      });
-    },
-    { rootMargin: isLowPowerDevice ? "900px 0px" : "640px 0px" }
-  );
-
-  cards.forEach((card) => observer.observe(card));
+    card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
+    card.classList.add("is-bg-loaded");
+    card.removeAttribute("data-bg");
+  });
 }
 
 async function fetchRooms() {
@@ -1791,7 +1821,7 @@ function renderLocalizedContent() {
   renderRoomOptions();
   renderRooms();
   renderAmenities();
-  setupLazyBackgrounds($("#amenitiesGrid"));
+  setupBackgroundImages($("#amenitiesGrid"));
   renderReviews();
   renderJournal();
   renderGallery();
@@ -2257,6 +2287,7 @@ async function submitAuthForm(form, mode) {
     updateAccountSummary(enrichedAuth);
     await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
+    startBookingAutoRefresh(enrichedAuth);
     form.reset();
     setAuthStatus("success", mode === "login" ? t("account.loggedInAs", { name }) : t("account.createdFor", { name }));
   } catch (error) {
@@ -2276,7 +2307,9 @@ function setupAuthForms() {
     updateAccountSummary(auth);
     await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
+    startBookingAutoRefresh(auth);
   });
+  setupBookingAutoRefresh();
 
   $$("[data-auth-tab]").forEach((button) => {
     button.addEventListener("click", () => switchAuthPanel(button.dataset.authTab));
@@ -2295,6 +2328,7 @@ function setupAuthForms() {
   $("#logoutButton").addEventListener("click", () => {
     clearStoredAuth();
     myBookings = [];
+    lastBookingsSignature = "";
     switchAuthPanel("login");
     updateAccountSummary(null);
     renderBookingHistory();
@@ -2702,7 +2736,7 @@ setupPreferences();
 renderRooms();
 renderRoomOptions();
 renderAmenities();
-setupLazyBackgrounds();
+setupBackgroundImages();
 renderReviews();
 renderJournal();
 renderGallery();
