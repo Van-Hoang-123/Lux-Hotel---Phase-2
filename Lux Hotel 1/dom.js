@@ -165,6 +165,7 @@ const translations = {
     "booking.children": "Children",
     "booking.search": "Search rooms",
     "booking.bookSelected": "Book stay",
+    "booking.confirmCreate": "Create this booking?",
     "booking.chooseRoom": "Choose room",
     "booking.arrivalDate": "Arrival date",
     "booking.departureDate": "Departure date",
@@ -252,10 +253,12 @@ const translations = {
     "account.noBookings": "No bookings yet.",
     "account.bookingLoadFailed": "Could not load your bookings.",
     "account.cancelBooking": "Cancel booking",
+    "account.confirmCancel": "Cancel this booking?",
     "account.canceling": "Canceling...",
     "account.cancelled": "Booking cancelled.",
     "account.bookingCancelFailed": "Could not cancel this booking.",
     "account.completePayment": "Complete payment",
+    "account.confirmPayment": "Complete payment for this booking?",
     "account.completingPayment": "Completing...",
     "account.paymentCompleted": "Payment completed.",
     "account.paymentFailed": "Could not complete this payment.",
@@ -335,6 +338,7 @@ const translations = {
     "booking.children": "Trẻ em",
     "booking.search": "Tìm phòng",
     "booking.bookSelected": "Đặt phòng",
+    "booking.confirmCreate": "Tạo booking này?",
     "booking.chooseRoom": "Chọn phòng",
     "booking.arrivalDate": "Ngày đến",
     "booking.departureDate": "Ngày đi",
@@ -422,10 +426,12 @@ const translations = {
     "account.noBookings": "Chưa có booking nào.",
     "account.bookingLoadFailed": "Không tải được booking của bạn.",
     "account.cancelBooking": "Hủy booking",
+    "account.confirmCancel": "Bạn chắc chắn muốn hủy booking này?",
     "account.canceling": "Đang hủy...",
     "account.cancelled": "Đã hủy booking.",
     "account.bookingCancelFailed": "Không hủy được booking này.",
     "account.completePayment": "Hoàn tất thanh toán",
+    "account.confirmPayment": "Xác nhận hoàn tất thanh toán booking này?",
     "account.completingPayment": "Đang xử lý...",
     "account.paymentCompleted": "Đã hoàn tất thanh toán.",
     "account.paymentFailed": "Không hoàn tất được thanh toán này.",
@@ -1561,6 +1567,7 @@ function setupBookingAutoRefresh() {
 
 async function cancelBooking(bookingId, button) {
   if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmCancel"))) return;
 
   button.disabled = true;
   button.textContent = t("account.canceling");
@@ -1604,6 +1611,7 @@ async function cancelBooking(bookingId, button) {
 
 async function completePayment(bookingId, button) {
   if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmPayment"))) return;
 
   button.disabled = true;
   button.textContent = t("account.completingPayment");
@@ -1964,6 +1972,10 @@ function setAuthStatus(type, message) {
   if (!status) return;
   status.className = `form-status ${type ? `is-visible ${type}` : ""}`;
   status.textContent = message || "";
+}
+
+function requestConfirmation(message) {
+  return window.confirm(message);
 }
 
 function updateAccountSummary(auth = getStoredAuth()) {
@@ -2386,6 +2398,8 @@ async function createBookingFromForm() {
     document.querySelector("#guest-account")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
+
+  if (!requestConfirmation(t("booking.confirmCreate"))) return;
 
   button.disabled = true;
   button.textContent = t("booking.booking");

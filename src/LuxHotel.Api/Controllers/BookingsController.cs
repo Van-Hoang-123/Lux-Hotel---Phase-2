@@ -275,11 +275,12 @@ namespace LuxHotel.Api.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "User,Admin")]
         [HttpPatch("/api/bookings/{id}/cancel")]
         public async Task<IActionResult> CancelBooking(Guid id)
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
 
             // Kiểm tra token
             if (!Guid.TryParse(userIdStr, out var userId))
@@ -295,7 +296,7 @@ namespace LuxHotel.Api.Controllers
             }
 
             // Bảo mật: Ngăn chặn User này dùng ID của Booking người khác để hủy trộm
-            if (booking.UserId != userId)
+            if (!isAdmin && booking.UserId != userId)
             {
                 return Forbid(); // Trả về 403 Forbidden
             }
@@ -306,8 +307,8 @@ namespace LuxHotel.Api.Controllers
                 return BadRequest(new { message = $"Cannot cancel a booking that is already {booking.BookingStatus}." });
             }
 
-            // Chặn hủy nếu đã đến hoặc vượt quá ngày nhận phòng (ArrivalDate)
-            if (DateTime.Now >= booking.ArrivalDate)
+            // User tự hủy thì vẫn chặn từ ngày nhận phòng; Admin có thể xử lý thủ công.
+            if (!isAdmin && DateTime.UtcNow.Date >= booking.ArrivalDate.Date)
             {
                 return BadRequest(new { message = "Cannot cancel the booking on or after the arrival date." });
             }

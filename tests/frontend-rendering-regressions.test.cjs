@@ -43,6 +43,8 @@ test("frontend exposes the user booking controller actions", () => {
   assert.match(dom, /getBookingGuest/);
   assert.match(dom, /guestFullName/);
   assert.match(dom, /guestEmail/);
+  assert.match(dom, /requestConfirmation\(t\("booking\.confirmCreate"\)\)/);
+  assert.match(dom, /requestConfirmation\(t\("account\.confirmCancel"\)\)/);
 });
 
 test("frontend exposes the payment completion action from the booking controller", () => {
@@ -55,6 +57,7 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(dom, /\["Confirmed", "Pending"\]\.includes\(booking\.status\)/);
   assert.match(dom, /const bookingPath = userHasRole\(auth, "Admin"\) \? "\/bookings" : "\/bookings\/my"/);
   assert.match(dom, /returnStatuses: \[400, 401, 403, 404, 405\]/);
+  assert.match(dom, /requestConfirmation\(t\("account\.confirmPayment"\)\)/);
   assert.match(css, /\.booking-item-actions \.payment-action/);
 });
 
