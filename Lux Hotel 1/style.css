@@ -971,6 +971,12 @@ select:focus {
     min-height: 54px;
 }
 
+#journalSearchInput::-webkit-search-cancel-button,
+#journalSearchInput::-webkit-search-decoration {
+    display: none;
+    appearance: none;
+}
+
 .journal-search button {
     min-height: 54px;
     border: 1px solid var(--line);

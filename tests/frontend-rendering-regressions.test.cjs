@@ -137,6 +137,7 @@ test("journal search calls the article search endpoint and can reset results", (
   assert.doesNotMatch(html, /data-i18n="journal\.searchButton"/);
   assert.match(html, /data-i18n-placeholder="journal\.searchPlaceholder"/);
   assert.match(css, /\.journal-search/);
+  assert.match(css, /#journalSearchInput::-webkit-search-cancel-button/);
   assert.match(dom, /function searchJournal\(query\)/);
   assert.match(dom, /const journalSearchDebounceMs = 320/);
   assert.match(dom, /function createAhoCorasickMatcher\(patterns\)/);
