@@ -38,6 +38,9 @@ const journalApiSearchDebounceMs = 320;
 const bookingSearchDebounceMs = 0;
 const adminBookingInitialRenderLimit = 120;
 const adminBookingRenderStep = 120;
+const adminBookingAsyncThreshold = 800;
+const adminBookingFilterBatchSize = 96;
+const adminBookingPrecomputeIdleTimeoutMs = 1200;
 const bookingFallbackRefreshMs = {
   admin: 30000,
   user: 45000,
@@ -61,6 +64,14 @@ let bookingSearchQuery = "";
 let bookingQuickFilter = "all";
 let bookingRenderLimit = adminBookingInitialRenderLimit;
 const bookingSearchDocumentCache = new Map();
+let bookingRenderSequence = 0;
+let bookingRenderTimer = 0;
+let bookingPrecomputeTimer = 0;
+let bookingPrecomputeUsesIdle = false;
+let lastBookingMatchesKey = "";
+let lastBookingMatches = [];
+let lastSortedBookingsKey = "";
+let lastSortedBookings = [];
 let bookingFallbackRefreshTimer = 0;
 let bookingRealtimeConnection = null;
 let bookingRefreshInFlight = false;
@@ -281,6 +292,7 @@ const translations = {
     "account.bookingSearchCount": "{{shown}} of {{total}} bookings",
     "account.bookingVisibleCount": "Showing {{visible}} of {{shown}} matches.",
     "account.loadMoreBookings": "Show more",
+    "account.filteringBookings": "Filtering bookings...",
     "account.noBookingMatches": "No bookings match this search.",
     "account.loadingBookings": "Loading bookings...",
     "account.noBookings": "No bookings yet.",
@@ -474,6 +486,7 @@ const translations = {
     "account.bookingSearchCount": "{{shown}} / {{total}} booking",
     "account.bookingVisibleCount": "Đang hiện {{visible}} / {{shown}} kết quả.",
     "account.loadMoreBookings": "Hiện thêm",
+    "account.filteringBookings": "Đang lọc booking...",
     "account.noBookingMatches": "Không có booking phù hợp.",
     "account.loadingBookings": "Đang tải booking...",
     "account.noBookings": "Chưa có booking nào.",
@@ -1500,10 +1513,10 @@ function canCancelBooking(booking) {
   return booking.status === "Confirmed";
 }
 
-function canCompletePayment(booking) {
+function canCompletePayment(booking, auth = getStoredAuth()) {
   return (
     paymentApiAvailable &&
-    userHasRole(getStoredAuth(), "Admin") &&
+    userHasRole(auth, "Admin") &&
     Boolean(booking.id) &&
     ["Confirmed", "Pending"].includes(booking.status) &&
     !isPaymentCompleted(booking.paymentStatus)
@@ -1538,8 +1551,9 @@ function bookingRoomName(booking) {
   return booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
 }
 
-function bookingSearchDocument(booking) {
-  if (bookingSearchDocumentCache.has(booking.id)) return bookingSearchDocumentCache.get(booking.id);
+function bookingSearchDocument(booking, auth = getStoredAuth()) {
+  const cacheKey = `${currentLanguage}|${paymentApiAvailable ? "payment" : "no-payment"}|${booking.id}`;
+  if (bookingSearchDocumentCache.has(cacheKey)) return bookingSearchDocumentCache.get(cacheKey);
 
   const room = findRoomById(booking.roomId);
   const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
@@ -1547,7 +1561,7 @@ function bookingSearchDocument(booking) {
     paymentStatus,
     booking.paymentStatus,
     isPaymentCompleted(booking.paymentStatus) ? "paid completed da thanh toan" : "pending unpaid chua thanh toan",
-    canCompletePayment(booking) ? `${t("account.completePayment")} needs payment complete payment` : "",
+    canCompletePayment(booking, auth) ? `${t("account.completePayment")} needs payment complete payment` : "",
   ];
 
   const documentText = normalizeSearchText([
@@ -1567,12 +1581,12 @@ function bookingSearchDocument(booking) {
     formatMoney(booking.totalPrice),
     ...paymentKeywords,
   ].filter(Boolean).join(" "));
-  bookingSearchDocumentCache.set(booking.id, documentText);
+  bookingSearchDocumentCache.set(cacheKey, documentText);
   return documentText;
 }
 
-function bookingMatchesQuickFilter(booking) {
-  if (bookingQuickFilter === "needs-payment") return canCompletePayment(booking);
+function bookingMatchesQuickFilter(booking, auth = getStoredAuth()) {
+  if (bookingQuickFilter === "needs-payment") return canCompletePayment(booking, auth);
   if (bookingQuickFilter === "paid") return isPaymentCompleted(booking.paymentStatus);
   if (bookingQuickFilter === "cancelled") return booking.status === "Cancelled";
   return true;
@@ -1581,13 +1595,13 @@ function bookingMatchesQuickFilter(booking) {
 function filterBookingsForAccount(bookings, auth) {
   if (!userHasRole(auth, "Admin")) return [...bookings];
 
-  const quickFilteredBookings = bookings.filter(bookingMatchesQuickFilter);
+  const quickFilteredBookings = bookings.filter((booking) => bookingMatchesQuickFilter(booking, auth));
   const keywords = searchKeywords(bookingSearchQuery, 1);
   if (!keywords.length) return quickFilteredBookings;
 
   const matcher = createAhoCorasickMatcher(keywords);
   return quickFilteredBookings.filter((booking) => {
-    const matches = new Set(matcher.find(bookingSearchDocument(booking)));
+    const matches = new Set(matcher.find(bookingSearchDocument(booking, auth)));
     return keywords.every((keyword) => matches.has(keyword));
   });
 }
@@ -1596,7 +1610,7 @@ function sortBookingsForAccount(bookings, auth) {
   if (!userHasRole(auth, "Admin")) return [...bookings];
 
   return [...bookings].sort((left, right) => {
-    const paymentPriority = Number(canCompletePayment(right)) - Number(canCompletePayment(left));
+    const paymentPriority = Number(canCompletePayment(right, auth)) - Number(canCompletePayment(left, auth));
     if (paymentPriority !== 0) return paymentPriority;
 
     const statusPriority = Number(right.status === "Confirmed") - Number(left.status === "Confirmed");
@@ -1608,6 +1622,20 @@ function sortBookingsForAccount(bookings, auth) {
   });
 }
 
+function sortedBookingsForAccount(bookings, auth = getStoredAuth()) {
+  const key = [
+    lastBookingsSignature,
+    userHasRole(auth, "Admin") ? "admin" : "user",
+    paymentApiAvailable ? "payment-api" : "no-payment-api",
+  ].join("|");
+
+  if (lastSortedBookingsKey === key) return lastSortedBookings;
+
+  lastSortedBookingsKey = key;
+  lastSortedBookings = sortBookingsForAccount(bookings, auth);
+  return lastSortedBookings;
+}
+
 function renderBookingItem(booking, auth = getStoredAuth()) {
   const roomName = bookingRoomName(booking);
   const status = booking.status || "Pending";
@@ -1617,7 +1645,7 @@ function renderBookingItem(booking, auth = getStoredAuth()) {
     ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
     : "";
   const guestInfoMarkup = renderAdminBookingGuest(booking, auth);
-  const paymentActionMarkup = canCompletePayment(booking)
+  const paymentActionMarkup = canCompletePayment(booking, auth)
     ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
     : "";
 
@@ -1685,35 +1713,84 @@ function updateBookingHistoryTitle(auth = getStoredAuth()) {
   title.textContent = t(userHasRole(auth, "Admin") ? "account.userBookings" : "account.myBookings");
 }
 
-function renderBookingHistory(message = "") {
-  const history = $("#bookingHistory");
-  const list = $("#bookingList");
-  if (!history || !list) return;
+function bookingMatchesKey(auth = getStoredAuth()) {
+  return [
+    lastBookingsSignature,
+    userHasRole(auth, "Admin") ? "admin" : "user",
+    bookingQuickFilter,
+    normalizeSearchText(bookingSearchQuery),
+    currentLanguage,
+    paymentApiAvailable ? "payment-api" : "no-payment-api",
+  ].join("|");
+}
 
-  const auth = getStoredAuth();
+function cancelBookingRenderJob() {
+  bookingRenderSequence += 1;
+  if (bookingRenderTimer) {
+    window.clearTimeout(bookingRenderTimer);
+    bookingRenderTimer = 0;
+  }
+}
+
+function clearBookingSearchCaches() {
+  bookingSearchDocumentCache.clear();
+  lastBookingMatchesKey = "";
+  lastBookingMatches = [];
+  lastSortedBookingsKey = "";
+  lastSortedBookings = [];
+}
+
+function stopBookingSearchPrecompute() {
+  if (bookingPrecomputeTimer) {
+    if (bookingPrecomputeUsesIdle && "cancelIdleCallback" in window) {
+      window.cancelIdleCallback(bookingPrecomputeTimer);
+    } else {
+      window.clearTimeout(bookingPrecomputeTimer);
+    }
+    bookingPrecomputeTimer = 0;
+    bookingPrecomputeUsesIdle = false;
+  }
+}
+
+function scheduleBookingSearchPrecompute(callback) {
+  if ("requestIdleCallback" in window) {
+    bookingPrecomputeUsesIdle = true;
+    bookingPrecomputeTimer = window.requestIdleCallback(callback, {
+      timeout: adminBookingPrecomputeIdleTimeoutMs,
+    });
+    return;
+  }
+
+  bookingPrecomputeUsesIdle = false;
+  bookingPrecomputeTimer = window.setTimeout(callback, 0);
+}
+
+function precomputeBookingSearchDocuments(bookings, auth = getStoredAuth()) {
+  stopBookingSearchPrecompute();
+  if (!userHasRole(auth, "Admin") || bookings.length <= adminBookingAsyncThreshold) return;
+
+  let index = 0;
+  const step = (deadline) => {
+    bookingPrecomputeTimer = 0;
+    bookingPrecomputeUsesIdle = false;
+
+    let processed = 0;
+    while (index < bookings.length && processed < adminBookingFilterBatchSize) {
+      bookingSearchDocument(bookings[index], auth);
+      index += 1;
+      processed += 1;
+
+      if (deadline && !deadline.didTimeout && deadline.timeRemaining() < 6) break;
+    }
+
+    if (index < bookings.length) scheduleBookingSearchPrecompute(step);
+  };
+
+  scheduleBookingSearchPrecompute(step);
+}
+
+function renderBookingMatches(matchedBookings, auth, list) {
   const isAdmin = userHasRole(auth, "Admin");
-  updateBookingHistoryTitle(auth);
-  history.hidden = !auth?.token;
-  history.classList.toggle("is-admin", Boolean(auth?.token && isAdmin));
-  if (!auth?.token) {
-    updateBookingAdminTools(auth, 0, 0);
-    list.innerHTML = "";
-    return;
-  }
-
-  if (message) {
-    updateBookingAdminTools(auth, 0, myBookings.length);
-    list.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
-    return;
-  }
-
-  if (!myBookings.length) {
-    updateBookingAdminTools(auth, 0, 0);
-    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookings"))}</p>`;
-    return;
-  }
-
-  const matchedBookings = sortBookingsForAccount(filterBookingsForAccount(myBookings, auth), auth);
   const renderLimit = isAdmin ? Math.min(bookingRenderLimit, matchedBookings.length) : matchedBookings.length;
   const visibleBookings = matchedBookings.slice(0, renderLimit);
   updateBookingAdminTools(auth, matchedBookings.length, myBookings.length, visibleBookings.length);
@@ -1728,6 +1805,99 @@ function renderBookingHistory(message = "") {
     : "";
 
   list.innerHTML = `${visibleBookings.map((booking) => renderBookingItem(booking, auth)).join("")}${loadMoreMarkup}`;
+}
+
+function renderBookingHistoryAsync(bookings, auth, list) {
+  const key = bookingMatchesKey(auth);
+  if (lastBookingMatchesKey === key) {
+    renderBookingMatches(lastBookingMatches, auth, list);
+    return;
+  }
+
+  cancelBookingRenderJob();
+  const sequence = bookingRenderSequence;
+  const keywords = searchKeywords(bookingSearchQuery, 1);
+  const matcher = keywords.length ? createAhoCorasickMatcher(keywords) : null;
+  const sortedBookings = sortedBookingsForAccount(bookings, auth);
+  const matches = [];
+  let index = 0;
+
+  updateBookingAdminTools(auth, 0, bookings.length, 0);
+  if (!list.children.length) {
+    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
+  }
+
+  const step = () => {
+    if (sequence !== bookingRenderSequence) return;
+
+    const end = Math.min(index + adminBookingFilterBatchSize, sortedBookings.length);
+    for (; index < end; index += 1) {
+      const booking = sortedBookings[index];
+      if (!bookingMatchesQuickFilter(booking, auth)) continue;
+      if (matcher) {
+        const found = new Set(matcher.find(bookingSearchDocument(booking, auth)));
+        if (!keywords.every((keyword) => found.has(keyword))) continue;
+      }
+      matches.push(booking);
+    }
+
+    if (index < sortedBookings.length) {
+      bookingRenderTimer = window.setTimeout(step, 0);
+      return;
+    }
+
+    bookingRenderTimer = 0;
+    if (sequence !== bookingRenderSequence) return;
+
+    lastBookingMatchesKey = key;
+    lastBookingMatches = matches;
+    renderBookingMatches(lastBookingMatches, auth, list);
+  };
+
+  bookingRenderTimer = window.setTimeout(step, 0);
+}
+
+function renderBookingHistory(message = "") {
+  const history = $("#bookingHistory");
+  const list = $("#bookingList");
+  if (!history || !list) return;
+
+  const auth = getStoredAuth();
+  const isAdmin = userHasRole(auth, "Admin");
+  updateBookingHistoryTitle(auth);
+  history.hidden = !auth?.token;
+  history.classList.toggle("is-admin", Boolean(auth?.token && isAdmin));
+  if (!auth?.token) {
+    cancelBookingRenderJob();
+    updateBookingAdminTools(auth, 0, 0);
+    list.innerHTML = "";
+    return;
+  }
+
+  if (message) {
+    cancelBookingRenderJob();
+    updateBookingAdminTools(auth, 0, myBookings.length);
+    list.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
+    return;
+  }
+
+  if (!myBookings.length) {
+    cancelBookingRenderJob();
+    updateBookingAdminTools(auth, 0, 0);
+    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookings"))}</p>`;
+    return;
+  }
+
+  if (isAdmin && myBookings.length > adminBookingAsyncThreshold) {
+    renderBookingHistoryAsync(myBookings, auth, list);
+    return;
+  }
+
+  cancelBookingRenderJob();
+  const matchedBookings = filterBookingsForAccount(sortedBookingsForAccount(myBookings, auth), auth);
+  lastBookingMatchesKey = bookingMatchesKey(auth);
+  lastBookingMatches = matchedBookings;
+  renderBookingMatches(matchedBookings, auth, list);
 }
 
 function bookingListSignature(bookings) {
@@ -1751,6 +1921,7 @@ function bookingListSignature(bookings) {
 }
 
 function queueBookingSearchRender(query) {
+  stopBookingSearchPrecompute();
   bookingSearchQuery = String(query || "");
   bookingRenderLimit = adminBookingInitialRenderLimit;
 
@@ -1777,6 +1948,8 @@ function resetBookingSearchState() {
   bookingSearchQuery = "";
   bookingQuickFilter = "all";
   bookingRenderLimit = adminBookingInitialRenderLimit;
+  clearBookingSearchCaches();
+  stopBookingSearchPrecompute();
   if (bookingSearchTimer) {
     window.clearTimeout(bookingSearchTimer);
     bookingSearchTimer = 0;
@@ -1788,6 +1961,8 @@ async function fetchMyBookings({ silent = false } = {}) {
   if (!auth?.token) {
     myBookings = [];
     lastBookingsSignature = "";
+    clearBookingSearchCaches();
+    stopBookingSearchPrecompute();
     renderBookingHistory();
     return;
   }
@@ -1818,6 +1993,8 @@ async function fetchMyBookings({ silent = false } = {}) {
         clearStoredAuth();
         myBookings = [];
         lastBookingsSignature = "";
+        clearBookingSearchCaches();
+        stopBookingSearchPrecompute();
         updateAccountSummary(null);
         renderBookingHistory();
         setAuthStatus("warning", t("booking.signInRequired"));
@@ -1826,6 +2003,8 @@ async function fetchMyBookings({ silent = false } = {}) {
 
       myBookings = [];
       lastBookingsSignature = "";
+      clearBookingSearchCaches();
+      stopBookingSearchPrecompute();
       renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
       return;
     }
@@ -1837,16 +2016,19 @@ async function fetchMyBookings({ silent = false } = {}) {
     const nextSignature = bookingListSignature(nextBookings);
     const hasChanged = nextSignature !== lastBookingsSignature;
     if (hasChanged) {
-      bookingSearchDocumentCache.clear();
+      clearBookingSearchCaches();
       bookingRenderLimit = adminBookingInitialRenderLimit;
     }
     myBookings = nextBookings;
     lastBookingsSignature = nextSignature;
+    if (hasChanged) precomputeBookingSearchDocuments(myBookings, auth);
     if (!silent || hasChanged) renderBookingHistory();
   } catch (error) {
     console.error("My bookings API error:", error);
     myBookings = [];
     lastBookingsSignature = "";
+    clearBookingSearchCaches();
+    stopBookingSearchPrecompute();
     renderBookingHistory(t("account.bookingLoadFailed"));
   }
 }
