@@ -291,6 +291,7 @@ const translations = {
     "account.filterCancelledBookings": "Cancelled",
     "account.bookingSearchCount": "{{shown}} of {{total}} bookings",
     "account.bookingVisibleCount": "Showing {{visible}} of {{shown}} matches.",
+    "account.bookingFilterProgress": "Scanning {{processed}} of {{total}} bookings. {{matched}} matches so far.",
     "account.loadMoreBookings": "Show more",
     "account.filteringBookings": "Filtering bookings...",
     "account.noBookingMatches": "No bookings match this search.",
@@ -485,6 +486,7 @@ const translations = {
     "account.filterCancelledBookings": "Đã hủy",
     "account.bookingSearchCount": "{{shown}} / {{total}} booking",
     "account.bookingVisibleCount": "Đang hiện {{visible}} / {{shown}} kết quả.",
+    "account.bookingFilterProgress": "Đã quét {{processed}} / {{total}} booking. Tạm thấy {{matched}} kết quả.",
     "account.loadMoreBookings": "Hiện thêm",
     "account.filteringBookings": "Đang lọc booking...",
     "account.noBookingMatches": "Không có booking phù hợp.",
@@ -1706,6 +1708,24 @@ function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCo
   }
 }
 
+function updateBookingFilterProgress(auth, matchedCount, totalCount, processedCount) {
+  const tools = $("#bookingAdminTools");
+  if (!tools) return;
+
+  const isAdmin = Boolean(auth?.token) && userHasRole(auth, "Admin");
+  tools.hidden = !isAdmin || !totalCount;
+  if (!isAdmin) return;
+
+  const count = $("#bookingSearchCount");
+  if (!count) return;
+
+  count.textContent = t("account.bookingFilterProgress", {
+    processed: Math.min(processedCount, totalCount),
+    total: totalCount,
+    matched: matchedCount,
+  });
+}
+
 function updateBookingHistoryTitle(auth = getStoredAuth()) {
   const title = $("#bookingHistoryTitle");
   if (!title) return;
@@ -1822,7 +1842,7 @@ function renderBookingHistoryAsync(bookings, auth, list) {
   const matches = [];
   let index = 0;
 
-  updateBookingAdminTools(auth, 0, bookings.length, 0);
+  updateBookingFilterProgress(auth, 0, sortedBookings.length, 0);
   if (!list.children.length) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
   }
@@ -1840,6 +1860,8 @@ function renderBookingHistoryAsync(bookings, auth, list) {
       }
       matches.push(booking);
     }
+
+    updateBookingFilterProgress(auth, matches.length, sortedBookings.length, index);
 
     if (index < sortedBookings.length) {
       bookingRenderTimer = window.setTimeout(step, 0);
