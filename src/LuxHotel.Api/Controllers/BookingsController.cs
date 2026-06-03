@@ -1,8 +1,10 @@
-﻿using LuxHotel.Application.Dtos;
+﻿using LuxHotel.Api.Hubs;
+using LuxHotel.Application.Dtos;
 using LuxHotel.Domain.Entities;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -13,10 +15,34 @@ namespace LuxHotel.Api.Controllers
     public class BookingsController : ControllerBase
     {
         private readonly LuxHotelDbContext _context;
+        private readonly IHubContext<BookingHub> _bookingHub;
+        private readonly ILogger<BookingsController> _logger;
 
-        public BookingsController(LuxHotelDbContext context)
+        public BookingsController(
+            LuxHotelDbContext context,
+            IHubContext<BookingHub> bookingHub,
+            ILogger<BookingsController> logger)
         {
             _context = context;
+            _bookingHub = bookingHub;
+            _logger = logger;
+        }
+
+        private async Task NotifyBookingChangedAsync(Guid bookingId, string action)
+        {
+            try
+            {
+                await _bookingHub.Clients.All.SendAsync("bookingChanged", new
+                {
+                    bookingId,
+                    action,
+                    updatedAt = DateTime.UtcNow
+                });
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Could not broadcast booking change for {BookingId}.", bookingId);
+            }
         }
 
         [HttpPost("/api/bookings/check-availability")]
@@ -141,6 +167,7 @@ namespace LuxHotel.Api.Controllers
 
                 // Lưu thành công cả 2 bảng mới Commit
                 await transaction.CommitAsync();
+                await NotifyBookingChangedAsync(newBooking.Id, "created");
 
                 var responseDto = new BookingResponseDTO
                 {
@@ -202,6 +229,38 @@ namespace LuxHotel.Api.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [HttpGet("/api/bookings")]
+        public async Task<IActionResult> GetAllBookings()
+        {
+            var bookings = await _context.Bookings
+                .AsNoTracking()
+                .Include(booking => booking.User)
+                .Include(booking => booking.Room)
+                .Include(booking => booking.Payment)
+                .OrderByDescending(booking => booking.CreatedAt)
+                .Select(booking => new
+                {
+                    booking.Id,
+                    booking.UserId,
+                    GuestFullName = booking.User.FullName,
+                    GuestEmail = booking.User.Email,
+                    booking.RoomId,
+                    RoomTitle = booking.Room.RoomType,
+                    booking.ArrivalDate,
+                    booking.DepartureDate,
+                    booking.Adult,
+                    booking.Children,
+                    booking.TotalPrice,
+                    booking.BookingStatus,
+                    PaymentStatus = booking.Payment != null ? booking.Payment.PaymentStatus : null,
+                    PaidAt = booking.Payment != null ? booking.Payment.PaidAt : null
+                })
+                .ToListAsync();
+
+            return Ok(bookings);
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpPatch("/api/toggle-room-status/{id}")]
         public async Task<IActionResult> ToggleRoomAvailableStatus(int id)
         {
@@ -243,11 +302,12 @@ namespace LuxHotel.Api.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "User,Admin")]
         [HttpPatch("/api/bookings/{id}/cancel")]
         public async Task<IActionResult> CancelBooking(Guid id)
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
 
             // Kiểm tra token
             if (!Guid.TryParse(userIdStr, out var userId))
@@ -263,7 +323,7 @@ namespace LuxHotel.Api.Controllers
             }
 
             // Bảo mật: Ngăn chặn User này dùng ID của Booking người khác để hủy trộm
-            if (booking.UserId != userId)
+            if (!isAdmin && booking.UserId != userId)
             {
                 return Forbid(); // Trả về 403 Forbidden
             }
@@ -274,8 +334,8 @@ namespace LuxHotel.Api.Controllers
                 return BadRequest(new { message = $"Cannot cancel a booking that is already {booking.BookingStatus}." });
             }
 
-            // Chặn hủy nếu đã đến hoặc vượt quá ngày nhận phòng (ArrivalDate)
-            if (DateTime.Now >= booking.ArrivalDate)
+            // User tự hủy thì vẫn chặn từ ngày nhận phòng; Admin có thể xử lý thủ công.
+            if (!isAdmin && DateTime.UtcNow.Date >= booking.ArrivalDate.Date)
             {
                 return BadRequest(new { message = "Cannot cancel the booking on or after the arrival date." });
             }
@@ -283,6 +343,7 @@ namespace LuxHotel.Api.Controllers
             // Cập nhật trạng thái
             booking.BookingStatus = "Cancelled";
             await _context.SaveChangesAsync();
+            await NotifyBookingChangedAsync(booking.Id, "cancelled");
 
             return Ok(new { message = "Booking has been cancelled successfully." });
         }
@@ -321,6 +382,7 @@ namespace LuxHotel.Api.Controllers
 
 
             await _context.SaveChangesAsync();
+            await NotifyBookingChangedAsync(booking.Id, "checkedOut");
 
             return Ok(new { message = "Guest has successfully checked out. The room is now available." });
         }
@@ -348,6 +410,7 @@ namespace LuxHotel.Api.Controllers
 
 
             await _context.SaveChangesAsync();
+            await NotifyBookingChangedAsync(payment.BookingId, "paymentCompleted");
 
             return Ok(new
             {

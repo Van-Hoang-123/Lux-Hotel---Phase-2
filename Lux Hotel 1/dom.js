@@ -33,6 +33,10 @@ const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
+const bookingFallbackRefreshMs = {
+  admin: 30000,
+  user: 45000,
+};
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
@@ -45,6 +49,10 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
 let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
+let bookingFallbackRefreshTimer = 0;
+let bookingRealtimeConnection = null;
+let bookingRefreshInFlight = false;
+let lastBookingsSignature = "";
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
   prefersReducedMotion ||
@@ -73,18 +81,24 @@ function formatDateForLegacyBackend(value) {
 const apiContract = window.LuxApiContract || {
   buildAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
-    arrivalDate: formatDateForBackend(arrivalDate),
-    departureDate: formatDateForBackend(departureDate),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    adults: Number(adultCount),
     adultCount: Number(adultCount),
+    children: Number(childCount),
     childCount: Number(childCount),
   }),
   buildBookingPayload: ({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
     guestFullName: String(guestFullName || "").trim(),
     guestEmail: String(guestEmail || "").trim(),
-    arrivalDate: formatDateForBackend(arrivalDate),
-    departureDate: formatDateForBackend(departureDate),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    adults: Number(adultCount),
     adultCount: Number(adultCount),
+    children: Number(childCount),
     childCount: Number(childCount),
   }),
   buildLegacyAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
@@ -152,10 +166,15 @@ const translations = {
     "booking.children": "Children",
     "booking.search": "Search rooms",
     "booking.bookSelected": "Book stay",
+    "booking.confirmCreate": "Create this booking?",
     "booking.chooseRoom": "Choose room",
     "booking.arrivalDate": "Arrival date",
     "booking.departureDate": "Departure date",
     "booking.selectDate": "Select date",
+    "booking.pricePreviewLabel": "Price",
+    "booking.pricePreviewDateHint": "Select dates",
+    "booking.pricePreviewNight": "{{count}} night",
+    "booking.pricePreviewNight_plural": "{{count}} nights",
     "booking.checking": "Checking...",
     "booking.booking": "Booking...",
     "booking.availableFallback": "Room is available.",
@@ -230,15 +249,18 @@ const translations = {
     "account.loggedOut": "Logged out.",
     "account.myBookingsLabel": "Bookings",
     "account.myBookings": "My bookings",
+    "account.userBookings": "User's bookings",
     "account.refreshBookings": "Refresh",
     "account.loadingBookings": "Loading bookings...",
     "account.noBookings": "No bookings yet.",
     "account.bookingLoadFailed": "Could not load your bookings.",
     "account.cancelBooking": "Cancel booking",
+    "account.confirmCancel": "Cancel this booking?",
     "account.canceling": "Canceling...",
     "account.cancelled": "Booking cancelled.",
     "account.bookingCancelFailed": "Could not cancel this booking.",
     "account.completePayment": "Complete payment",
+    "account.confirmPayment": "Complete payment for this booking?",
     "account.completingPayment": "Completing...",
     "account.paymentCompleted": "Payment completed.",
     "account.paymentFailed": "Could not complete this payment.",
@@ -248,6 +270,8 @@ const translations = {
     "account.paymentStatus": "Payment: {{status}}",
     "account.paymentPending": "Pending",
     "account.paymentCompletedStatus": "Completed",
+    "account.bookingGuestLabel": "Guest",
+    "account.bookingUserId": "User ID: {{id}}",
     "account.bookingDates": "{{arrival}} to {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Total: {{total}}",
@@ -316,10 +340,15 @@ const translations = {
     "booking.children": "Trẻ em",
     "booking.search": "Tìm phòng",
     "booking.bookSelected": "Đặt phòng",
+    "booking.confirmCreate": "Tạo booking này?",
     "booking.chooseRoom": "Chọn phòng",
     "booking.arrivalDate": "Ngày đến",
     "booking.departureDate": "Ngày đi",
     "booking.selectDate": "Chọn ngày",
+    "booking.pricePreviewLabel": "Giá",
+    "booking.pricePreviewDateHint": "Chọn ngày",
+    "booking.pricePreviewNight": "{{count}} đêm",
+    "booking.pricePreviewNight_plural": "{{count}} đêm",
     "booking.checking": "Đang kiểm tra...",
     "booking.booking": "Đang đặt...",
     "booking.availableFallback": "Phòng còn trống.",
@@ -394,15 +423,18 @@ const translations = {
     "account.loggedOut": "Đã đăng xuất.",
     "account.myBookingsLabel": "Booking",
     "account.myBookings": "Booking của tôi",
+    "account.userBookings": "Booking của user",
     "account.refreshBookings": "Tải lại",
     "account.loadingBookings": "Đang tải booking...",
     "account.noBookings": "Chưa có booking nào.",
     "account.bookingLoadFailed": "Không tải được booking của bạn.",
     "account.cancelBooking": "Hủy booking",
+    "account.confirmCancel": "Bạn chắc chắn muốn hủy booking này?",
     "account.canceling": "Đang hủy...",
     "account.cancelled": "Đã hủy booking.",
     "account.bookingCancelFailed": "Không hủy được booking này.",
     "account.completePayment": "Hoàn tất thanh toán",
+    "account.confirmPayment": "Xác nhận hoàn tất thanh toán booking này?",
     "account.completingPayment": "Đang xử lý...",
     "account.paymentCompleted": "Đã hoàn tất thanh toán.",
     "account.paymentFailed": "Không hoàn tất được thanh toán này.",
@@ -412,6 +444,8 @@ const translations = {
     "account.paymentStatus": "Thanh toán: {{status}}",
     "account.paymentPending": "Chờ thanh toán",
     "account.paymentCompletedStatus": "Đã thanh toán",
+    "account.bookingGuestLabel": "Khách",
+    "account.bookingUserId": "Mã user: {{id}}",
     "account.bookingDates": "{{arrival}} đến {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Tổng: {{total}}",
@@ -656,6 +690,7 @@ function saveAuth(auth) {
 }
 
 function clearStoredAuth() {
+  stopBookingAutoRefresh();
   localStorage.removeItem(authStorageKey);
 }
 
@@ -1155,6 +1190,7 @@ function renderRoomOptions() {
   if (!rooms.length) {
     selectedRoomId = 0;
     select.innerHTML = `<option value="">${escapeHtml(t("rooms.empty"))}</option>`;
+    updateBookingPricePreview();
     return;
   }
 
@@ -1171,6 +1207,7 @@ function renderRoomOptions() {
       `;
     })
     .join("");
+  updateBookingPricePreview();
 }
 
 function renderRooms() {
@@ -1186,7 +1223,7 @@ function renderRooms() {
         <article class="room-card">
           <button class="room-card-button" type="button" data-room-index="${index}" aria-label="${escapeHtml(t("rooms.viewDetailsAria", { room: title }))}">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" decoding="async" />
             </div>
             <div class="content">
               <p class="price">${escapeHtml(roomPrice(room))}</p>
@@ -1281,10 +1318,25 @@ function isPaymentCompleted(value) {
 
 function normalizeBooking(booking = {}) {
   const payment = booking.payment || booking.Payment || {};
+  const user = booking.user || booking.User || booking.guest || booking.Guest || {};
   return {
     id: String(booking.id || booking.Id || ""),
     roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
     roomTitle: firstValue(booking.roomTitle, booking.RoomTitle, booking.roomName, booking.RoomName),
+    userId: String(firstValue(booking.userId, booking.UserId, user.id, user.Id) || ""),
+    guestFullName: firstValue(
+      booking.guestFullName,
+      booking.GuestFullName,
+      booking.fullName,
+      booking.FullName,
+      user.fullName,
+      user.FullName,
+      user.name,
+      user.Name,
+      user.userName,
+      user.UserName
+    ),
+    guestEmail: firstValue(booking.guestEmail, booking.GuestEmail, booking.email, booking.Email, user.email, user.Email),
     arrivalDate: toDateInputLike(booking.arrivalDate || booking.ArrivalDate || ""),
     departureDate: toDateInputLike(booking.departureDate || booking.DepartureDate || ""),
     adult: Number(booking.adultCount ?? booking.AdultCount ?? booking.adult ?? booking.Adult ?? booking.adults ?? booking.Adults ?? 1),
@@ -1306,11 +1358,42 @@ function canCancelBooking(booking) {
 
 function canCompletePayment(booking) {
   return (
+    paymentApiAvailable &&
     userHasRole(getStoredAuth(), "Admin") &&
     Boolean(booking.id) &&
     ["Confirmed", "Pending"].includes(booking.status) &&
     !isPaymentCompleted(booking.paymentStatus)
   );
+}
+
+function renderAdminBookingGuest(booking, auth) {
+  if (!userHasRole(auth, "Admin")) return "";
+
+  const guestName = firstValue(booking.guestFullName, booking.guestEmail, booking.userId);
+  if (!guestName) return "";
+
+  const guestEmailMarkup = booking.guestEmail && booking.guestEmail !== guestName
+    ? `<small>${escapeHtml(booking.guestEmail)}</small>`
+    : "";
+  const userIdMarkup = booking.userId && booking.userId !== booking.guestEmail
+    ? `<small>${escapeHtml(t("account.bookingUserId", { id: booking.userId }))}</small>`
+    : "";
+
+  return `
+    <div class="booking-guest-info">
+      <span>${escapeHtml(t("account.bookingGuestLabel"))}</span>
+      <strong>${escapeHtml(guestName)}</strong>
+      ${guestEmailMarkup}
+      ${userIdMarkup}
+    </div>
+  `;
+}
+
+function updateBookingHistoryTitle(auth = getStoredAuth()) {
+  const title = $("#bookingHistoryTitle");
+  if (!title) return;
+
+  title.textContent = t(userHasRole(auth, "Admin") ? "account.userBookings" : "account.myBookings");
 }
 
 function renderBookingHistory(message = "") {
@@ -1319,6 +1402,7 @@ function renderBookingHistory(message = "") {
   if (!history || !list) return;
 
   const auth = getStoredAuth();
+  updateBookingHistoryTitle(auth);
   history.hidden = !auth?.token;
   if (!auth?.token) {
     list.innerHTML = "";
@@ -1345,6 +1429,7 @@ function renderBookingHistory(message = "") {
       const paymentStatusMarkup = paymentStatus
         ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
         : "";
+      const guestInfoMarkup = renderAdminBookingGuest(booking, auth);
       const paymentActionMarkup = canCompletePayment(booking)
         ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
         : "";
@@ -1360,6 +1445,7 @@ function renderBookingHistory(message = "") {
             </div>
             <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
           </div>
+          ${guestInfoMarkup}
           <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
           <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
           ${paymentStatusMarkup}
@@ -1373,10 +1459,31 @@ function renderBookingHistory(message = "") {
     .join("");
 }
 
+function bookingListSignature(bookings) {
+  return JSON.stringify(
+    bookings.map((booking) => ({
+      id: booking.id,
+      roomId: booking.roomId,
+      userId: booking.userId,
+      guestFullName: booking.guestFullName,
+      guestEmail: booking.guestEmail,
+      arrivalDate: booking.arrivalDate,
+      departureDate: booking.departureDate,
+      adult: booking.adult,
+      children: booking.children,
+      totalPrice: booking.totalPrice,
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      paidAt: booking.paidAt,
+    }))
+  );
+}
+
 async function fetchMyBookings({ silent = false } = {}) {
   const auth = getStoredAuth();
   if (!auth?.token) {
     myBookings = [];
+    lastBookingsSignature = "";
     renderBookingHistory();
     return;
   }
@@ -1406,6 +1513,7 @@ async function fetchMyBookings({ silent = false } = {}) {
       if (response.status === 401) {
         clearStoredAuth();
         myBookings = [];
+        lastBookingsSignature = "";
         updateAccountSummary(null);
         renderBookingHistory();
         setAuthStatus("warning", t("booking.signInRequired"));
@@ -1413,24 +1521,113 @@ async function fetchMyBookings({ silent = false } = {}) {
       }
 
       myBookings = [];
+      lastBookingsSignature = "";
       renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
       return;
     }
 
-    myBookings = apiContract
+    const nextBookings = apiContract
       .readItems(data)
       .map(normalizeBooking)
       .filter((booking) => booking.id);
-    renderBookingHistory();
+    const nextSignature = bookingListSignature(nextBookings);
+    const hasChanged = nextSignature !== lastBookingsSignature;
+    myBookings = nextBookings;
+    lastBookingsSignature = nextSignature;
+    if (!silent || hasChanged) renderBookingHistory();
   } catch (error) {
     console.error("My bookings API error:", error);
     myBookings = [];
+    lastBookingsSignature = "";
     renderBookingHistory(t("account.bookingLoadFailed"));
   }
 }
 
+function buildBookingHubUrl() {
+  const normalizedApiBase = normalizeApiBase(apiBaseUrl);
+  if (!normalizedApiBase || normalizedApiBase === "/api") return "/hubs/bookings";
+
+  return normalizedApiBase.endsWith("/api")
+    ? `${normalizedApiBase.slice(0, -4)}/hubs/bookings`
+    : `${normalizedApiBase}/hubs/bookings`;
+}
+
+async function refreshBookingsSilently() {
+  if (document.hidden || bookingRefreshInFlight) return;
+
+  bookingRefreshInFlight = true;
+  try {
+    await fetchMyBookings({ silent: true });
+  } finally {
+    bookingRefreshInFlight = false;
+  }
+}
+
+function startBookingFallbackRefresh(auth = getStoredAuth()) {
+  if (!auth?.token) return;
+
+  const interval = userHasRole(auth, "Admin") ? bookingFallbackRefreshMs.admin : bookingFallbackRefreshMs.user;
+  bookingFallbackRefreshTimer = window.setInterval(refreshBookingsSilently, interval);
+}
+
+async function startBookingRealtime(auth = getStoredAuth()) {
+  if (!auth?.token || !window.signalR) return;
+
+  const connection = new window.signalR.HubConnectionBuilder()
+    .withUrl(buildBookingHubUrl(), {
+      accessTokenFactory: () => getStoredAuth()?.token || auth.token || "",
+    })
+    .withAutomaticReconnect()
+    .build();
+
+  bookingRealtimeConnection = connection;
+  connection.on("bookingChanged", refreshBookingsSilently);
+  connection.onreconnected(refreshBookingsSilently);
+  connection.onclose(() => {
+    if (bookingRealtimeConnection === connection) bookingRealtimeConnection = null;
+  });
+
+  try {
+    await connection.start();
+    await refreshBookingsSilently();
+  } catch (error) {
+    console.warn("Booking realtime connection failed; using fallback refresh.", error);
+    if (bookingRealtimeConnection === connection) bookingRealtimeConnection = null;
+  }
+}
+
+function stopBookingAutoRefresh() {
+  if (bookingFallbackRefreshTimer) {
+    window.clearInterval(bookingFallbackRefreshTimer);
+    bookingFallbackRefreshTimer = 0;
+  }
+
+  const connection = bookingRealtimeConnection;
+  bookingRealtimeConnection = null;
+  if (connection) connection.stop().catch(() => {});
+}
+
+function startBookingAutoRefresh(auth = getStoredAuth()) {
+  stopBookingAutoRefresh();
+  if (!auth?.token) return;
+
+  startBookingRealtime(auth);
+  startBookingFallbackRefresh(auth);
+}
+
+function setupBookingAutoRefresh() {
+  document.addEventListener("visibilitychange", () => {
+    const auth = getStoredAuth();
+    if (!auth?.token || document.hidden) return;
+
+    if (!bookingRealtimeConnection) startBookingRealtime(auth);
+    refreshBookingsSilently();
+  });
+}
+
 async function cancelBooking(bookingId, button) {
   if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmCancel"))) return;
 
   button.disabled = true;
   button.textContent = t("account.canceling");
@@ -1474,6 +1671,7 @@ async function cancelBooking(bookingId, button) {
 
 async function completePayment(bookingId, button) {
   if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmPayment"))) return;
 
   button.disabled = true;
   button.textContent = t("account.completingPayment");
@@ -1536,7 +1734,7 @@ function renderReviews() {
       (review) => `
         <article class="review-card">
           <header>
-            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" fetchpriority="low" />
+            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" decoding="async" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
               <p>${escapeHtml(t("common.verifiedGuest"))}</p>
@@ -1554,7 +1752,7 @@ function renderJournal() {
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="eager" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" decoding="async" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>
@@ -1572,7 +1770,7 @@ function renderGallery() {
       const title = localized(item, "title");
       return `
         <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="${escapeHtml(t("gallery.openAria", { title }))}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" decoding="async" />
           <span>
             <small>${escapeHtml(localized(item, "kicker"))}</small>
             <strong>${escapeHtml(title)}</strong>
@@ -1583,57 +1781,18 @@ function renderGallery() {
     .join("");
 }
 
-function setupLazyBackgrounds(root = document) {
+function setupBackgroundImages(root = document) {
   const cards = $$("[data-bg]", root);
   if (!cards.length) return;
 
-  const runWhenIdle = (callback) => {
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(callback, { timeout: 900 });
-      return;
-    }
-
-    window.setTimeout(callback, 80);
-  };
-
-  const loadBackground = (card) => {
+  cards.forEach((card) => {
     const image = card.dataset.bg;
-    if (!image || card.classList.contains("is-bg-loading")) return;
+    if (!image) return;
 
-    card.classList.add("is-bg-loading");
-    const loader = new Image();
-    loader.decoding = "async";
-    loader.onload = () => {
-      runWhenIdle(() => {
-        card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
-        card.classList.add("is-bg-loaded");
-        card.removeAttribute("data-bg");
-      });
-    };
-    loader.onerror = () => {
-      card.classList.remove("is-bg-loading");
-      card.removeAttribute("data-bg");
-    };
-    loader.src = image;
-  };
-
-  if (!("IntersectionObserver" in window)) {
-    cards.forEach(loadBackground);
-    return;
-  }
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        loadBackground(entry.target);
-        observer.unobserve(entry.target);
-      });
-    },
-    { rootMargin: isLowPowerDevice ? "900px 0px" : "640px 0px" }
-  );
-
-  cards.forEach((card) => observer.observe(card));
+    card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
+    card.classList.add("is-bg-loaded");
+    card.removeAttribute("data-bg");
+  });
 }
 
 async function fetchRooms() {
@@ -1730,7 +1889,7 @@ function renderLocalizedContent() {
   renderRoomOptions();
   renderRooms();
   renderAmenities();
-  setupLazyBackgrounds($("#amenitiesGrid"));
+  setupBackgroundImages($("#amenitiesGrid"));
   renderReviews();
   renderJournal();
   renderGallery();
@@ -1875,6 +2034,10 @@ function setAuthStatus(type, message) {
   status.textContent = message || "";
 }
 
+function requestConfirmation(message) {
+  return window.confirm(message);
+}
+
 function updateAccountSummary(auth = getStoredAuth()) {
   const summary = $("#accountSummary");
   const logoutButton = $("#logoutButton");
@@ -1884,6 +2047,8 @@ function updateAccountSummary(auth = getStoredAuth()) {
   const tabs = $(".auth-tabs");
   const panels = $$("[data-auth-panel]");
   if (!summary || !logoutButton) return;
+
+  updateBookingHistoryTitle(auth);
 
   const user = auth?.user;
   if (auth?.token) {
@@ -2037,6 +2202,48 @@ function updateDateDisplays() {
   $$("input[type='date']").forEach(updateDateDisplay);
 }
 
+function stayNightCount(arrival, departure) {
+  if (!arrival || !departure) return 0;
+
+  const arrivalDate = new Date(`${arrival}T00:00:00`);
+  const departureDate = new Date(`${departure}T00:00:00`);
+  if (Number.isNaN(arrivalDate.getTime()) || Number.isNaN(departureDate.getTime())) return 0;
+
+  const nights = Math.round((departureDate - arrivalDate) / 86_400_000);
+  return nights > 0 ? nights : 0;
+}
+
+function roomNightlyPriceValue(room) {
+  const numericPrice = Number(
+    room?.priceValue ?? room?.nightlyPrice ?? room?.NightlyPrice ?? room?.pricePerNight ?? room?.PricePerNight ?? room?.Price
+  );
+  if (Number.isFinite(numericPrice) && numericPrice > 0) return numericPrice;
+
+  const priceText = String(firstValue(room?.price, room?.priceVi, room?.Price, room?.PriceVi) || "");
+  const match = priceText.match(/\d+(?:[,.]\d+)*/);
+  if (!match) return 0;
+
+  const parsed = Number(match[0].replaceAll(",", ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function updateBookingPricePreview() {
+  const value = $("#bookingPriceValue");
+  const hint = $("#bookingPriceHint");
+  if (!value || !hint) return;
+
+  const { arrival, departure, roomId } = readBookingFormValues();
+  const room = findRoomById(roomId) || rooms[0] || allRooms[0];
+  const nightlyPrice = roomNightlyPriceValue(room);
+  const nights = stayNightCount(arrival, departure);
+  const total = nightlyPrice * Math.max(nights, 1);
+
+  value.textContent = total > 0 ? formatMoney(total) : "--";
+  hint.textContent = nights > 0
+    ? t(nights === 1 ? "booking.pricePreviewNight" : "booking.pricePreviewNight_plural", { count: nights })
+    : t("booking.pricePreviewDateHint");
+}
+
 function openNativeDatePicker(input) {
   if (!input) return;
   input.focus({ preventScroll: true });
@@ -2154,6 +2361,7 @@ async function submitAuthForm(form, mode) {
     updateAccountSummary(enrichedAuth);
     await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
+    startBookingAutoRefresh(enrichedAuth);
     form.reset();
     setAuthStatus("success", mode === "login" ? t("account.loggedInAs", { name }) : t("account.createdFor", { name }));
   } catch (error) {
@@ -2173,7 +2381,9 @@ function setupAuthForms() {
     updateAccountSummary(auth);
     await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
+    startBookingAutoRefresh(auth);
   });
+  setupBookingAutoRefresh();
 
   $$("[data-auth-tab]").forEach((button) => {
     button.addEventListener("click", () => switchAuthPanel(button.dataset.authTab));
@@ -2190,8 +2400,10 @@ function setupAuthForms() {
   });
 
   $("#logoutButton").addEventListener("click", () => {
+    stopBookingAutoRefresh();
     clearStoredAuth();
     myBookings = [];
+    lastBookingsSignature = "";
     switchAuthPanel("login");
     updateAccountSummary(null);
     renderBookingHistory();
@@ -2249,6 +2461,8 @@ async function createBookingFromForm() {
     document.querySelector("#guest-account")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
+
+  if (!requestConfirmation(t("booking.confirmCreate"))) return;
 
   button.disabled = true;
   button.textContent = t("booking.booking");
@@ -2318,22 +2532,28 @@ function setupForms() {
   roomSelect.addEventListener("change", () => {
     selectedRoomId = Number(roomSelect.value || rooms[0]?.id || 1);
     setBookingStatus("", "");
+    updateBookingPricePreview();
   });
 
   ["#arrivalDate", "#departureDate"].forEach((selector) => {
     $(selector).addEventListener("change", (event) => {
       updateDateDisplay(event.currentTarget);
       resetRoomResults();
+      updateBookingPricePreview();
     });
   });
   $("#adult").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount);
     resetRoomResults();
+    updateBookingPricePreview();
   });
   $("#children").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount);
     resetRoomResults();
+    updateBookingPricePreview();
   });
+
+  updateBookingPricePreview();
 
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2593,7 +2813,7 @@ setupPreferences();
 renderRooms();
 renderRoomOptions();
 renderAmenities();
-setupLazyBackgrounds();
+setupBackgroundImages();
 renderReviews();
 renderJournal();
 renderGallery();
