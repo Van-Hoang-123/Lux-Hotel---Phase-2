@@ -116,9 +116,14 @@ test("account login and register UI is not hidden by scroll reveal animations", 
 
 test("journal search calls the article search endpoint and can reset results", () => {
   assert.match(html, /id="journalSearchForm"[\s\S]*id="journalSearchInput"[\s\S]*id="journalSearchClear"/);
+  assert.doesNotMatch(html, /data-i18n="journal\.searchButton"/);
   assert.match(html, /data-i18n-placeholder="journal\.searchPlaceholder"/);
   assert.match(css, /\.journal-search/);
   assert.match(dom, /function searchJournal\(query\)/);
+  assert.match(dom, /const journalSearchDebounceMs = 320/);
+  assert.match(dom, /function queueJournalSearch\(query\)/);
+  assert.match(dom, /window\.setTimeout\(\(\) => \{[\s\S]*searchJournal\(trimmedQuery\)/);
+  assert.match(dom, /input\.addEventListener\("input", \(\) => \{[\s\S]*queueJournalSearch\(input\.value\)/);
   assert.match(dom, /\/articles\/search\?q=\$\{encodeURIComponent\(trimmedQuery\)\}/);
   assert.match(dom, /function localJournalSearch\(query\)/);
   assert.match(dom, /journal = \[\.\.\.allJournalPosts\]/);

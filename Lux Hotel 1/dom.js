@@ -33,6 +33,7 @@ const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
+const journalSearchDebounceMs = 320;
 const bookingFallbackRefreshMs = {
   admin: 30000,
   user: 45000,
@@ -49,6 +50,8 @@ let currentLanguage = supportedLanguages.includes(localStorage.getItem(languageS
 let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" : "day";
 let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
+let journalSearchTimer = 0;
+let journalSearchSequence = 0;
 let bookingFallbackRefreshTimer = 0;
 let bookingRealtimeConnection = null;
 let bookingRefreshInFlight = false;
@@ -221,7 +224,6 @@ const translations = {
     "journal.defaultCopy": "Stories from the island.",
     "journal.searchLabel": "Search stories",
     "journal.searchPlaceholder": "Try style, island, comfort",
-    "journal.searchButton": "Search",
     "journal.clearSearch": "Clear",
     "journal.loadingSearch": "Searching stories...",
     "journal.searchResults": "Found {{count}} matching stories.",
@@ -403,7 +405,6 @@ const translations = {
     "journal.defaultCopy": "Câu chuyện từ hòn đảo.",
     "journal.searchLabel": "Tìm câu chuyện",
     "journal.searchPlaceholder": "Thử phong cách, hòn đảo, thoải mái",
-    "journal.searchButton": "Tìm",
     "journal.clearSearch": "Xóa",
     "journal.loadingSearch": "Đang tìm câu chuyện...",
     "journal.searchResults": "Tìm thấy {{count}} câu chuyện phù hợp.",
@@ -1835,6 +1836,7 @@ function setJournalSearchStatus(type, message) {
 }
 
 async function searchJournal(query) {
+  const searchId = ++journalSearchSequence;
   const trimmedQuery = String(query || "").trim();
   const clearButton = $("#journalSearchClear");
   if (clearButton) clearButton.hidden = !trimmedQuery;
@@ -1859,6 +1861,8 @@ async function searchJournal(query) {
       throw new Error(formatApiError(data, t("journal.searchFailed")));
     }
 
+    if (searchId !== journalSearchSequence) return;
+
     const apiPosts = apiContract.readItems(data).map(normalizeArticle);
     journal = apiPosts.length ? apiPosts : localJournalSearch(trimmedQuery);
     renderJournal();
@@ -1868,6 +1872,8 @@ async function searchJournal(query) {
     );
     window.ScrollTrigger?.refresh();
   } catch (error) {
+    if (searchId !== journalSearchSequence) return;
+
     console.warn("Using local journal search because the API search is unavailable.", error);
     journal = localJournalSearch(trimmedQuery);
     renderJournal();
@@ -1877,6 +1883,27 @@ async function searchJournal(query) {
     );
     window.ScrollTrigger?.refresh();
   }
+}
+
+function queueJournalSearch(query) {
+  const trimmedQuery = String(query || "").trim();
+  const clearButton = $("#journalSearchClear");
+  if (clearButton) clearButton.hidden = !trimmedQuery;
+
+  if (journalSearchTimer) {
+    window.clearTimeout(journalSearchTimer);
+    journalSearchTimer = 0;
+  }
+
+  if (!trimmedQuery) {
+    searchJournal("");
+    return;
+  }
+
+  journalSearchTimer = window.setTimeout(() => {
+    journalSearchTimer = 0;
+    searchJournal(trimmedQuery);
+  }, journalSearchDebounceMs);
 }
 
 function renderGallery() {
@@ -2548,19 +2575,21 @@ function setupJournalSearch() {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (journalSearchTimer) {
+      window.clearTimeout(journalSearchTimer);
+      journalSearchTimer = 0;
+    }
     searchJournal(input.value);
   });
 
   input.addEventListener("input", () => {
-    const hasQuery = Boolean(input.value.trim());
-    if (clearButton) clearButton.hidden = !hasQuery;
-    if (!hasQuery) searchJournal("");
+    queueJournalSearch(input.value);
   });
 
   clearButton?.addEventListener("click", () => {
     input.value = "";
     input.focus();
-    searchJournal("");
+    queueJournalSearch("");
   });
 }
 
