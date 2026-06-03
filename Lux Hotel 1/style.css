@@ -976,8 +976,8 @@ select:focus {
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 0 24px;
-    background: var(--accent);
-    color: #fff;
+    background: var(--gold);
+    color: var(--deep);
     font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 900;
@@ -988,17 +988,17 @@ select:focus {
 
 .journal-search button:hover {
     border-color: transparent;
-    background: var(--accent-dark);
+    background: var(--gold-dark);
     transform: translateY(-1px);
 }
 
 .journal-search button[type="button"] {
     background: transparent;
-    color: var(--text);
+    color: var(--ink);
 }
 
 .journal-search button[type="button"]:hover {
-    border-color: var(--accent);
+    border-color: var(--gold);
     background: var(--card);
 }
 
