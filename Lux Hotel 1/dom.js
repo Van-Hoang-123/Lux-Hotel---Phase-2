@@ -619,56 +619,73 @@ function createAhoCorasickMatcher(patterns) {
       .map((pattern) => String(pattern || "").trim())
       .filter(Boolean)
   )];
-  const nodes = [{ next: new Map(), failure: 0, outputs: [] }];
+  const nodes = [{ next: new Map(), go: new Map(), failure: 0, exit: -1, outputs: [] }];
+  const alphabet = new Set();
 
   cleanedPatterns.forEach((pattern) => {
     let state = 0;
     for (const character of pattern) {
+      alphabet.add(character);
       if (!nodes[state].next.has(character)) {
         nodes[state].next.set(character, nodes.length);
-        nodes.push({ next: new Map(), failure: 0, outputs: [] });
+        nodes.push({ next: new Map(), go: new Map(), failure: 0, exit: -1, outputs: [] });
       }
       state = nodes[state].next.get(character);
     }
     nodes[state].outputs.push(pattern);
   });
 
+  const alphabetList = [...alphabet];
+  alphabetList.forEach((character) => {
+    nodes[0].go.set(character, nodes[0].next.get(character) ?? 0);
+  });
+
   const queue = [...nodes[0].next.values()];
   while (queue.length) {
     const state = queue.shift();
-    for (const [character, target] of nodes[state].next) {
-      queue.push(target);
-      let failure = nodes[state].failure;
-      while (failure !== 0 && !nodes[failure].next.has(character)) {
-        failure = nodes[failure].failure;
-      }
-      if (nodes[failure].next.has(character)) {
-        nodes[target].failure = nodes[failure].next.get(character);
-        nodes[target].outputs.push(...nodes[nodes[target].failure].outputs);
+    const failure = nodes[state].failure;
+    nodes[state].exit = nodes[failure].outputs.length ? failure : nodes[failure].exit;
+
+    for (const character of alphabetList) {
+      if (nodes[state].next.has(character)) {
+        const target = nodes[state].next.get(character);
+        nodes[state].go.set(character, target);
+        nodes[target].failure = nodes[failure].go.get(character) ?? 0;
+        queue.push(target);
+      } else {
+        nodes[state].go.set(character, nodes[failure].go.get(character) ?? 0);
       }
     }
   }
 
-  const find = (text) => {
+  const go = (state, character) => nodes[state].go.get(character) ?? 0;
+
+  const findOccurrences = (text) => {
     if (nodes.length === 1 || !text) return [];
 
-    const matches = [];
+    const occurrences = [];
     let state = 0;
-    for (const character of String(text)) {
-      while (state !== 0 && !nodes[state].next.has(character)) {
-        state = nodes[state].failure;
+    [...String(text)].forEach((character, index) => {
+      state = go(state, character);
+
+      for (const pattern of nodes[state].outputs) {
+        occurrences.push({ pattern, startIndex: index - pattern.length + 1, endIndex: index });
       }
-      if (nodes[state].next.has(character)) {
-        state = nodes[state].next.get(character);
+
+      for (let exit = nodes[state].exit; exit !== -1; exit = nodes[exit].exit) {
+        for (const pattern of nodes[exit].outputs) {
+          occurrences.push({ pattern, startIndex: index - pattern.length + 1, endIndex: index });
+        }
       }
-      matches.push(...nodes[state].outputs);
-    }
-    return matches;
+    });
+    return occurrences;
   };
+  const find = (text) => findOccurrences(text).map((match) => match.pattern);
 
   return {
     hasPatterns: cleanedPatterns.length > 0,
     find,
+    findOccurrences,
     containsAny: (text) => find(text).length > 0,
   };
 }

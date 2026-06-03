@@ -17,6 +17,18 @@ public class AhoCorasickMatcherTests
     }
 
     [Fact]
+    public void Matcher_reports_overlapping_suffix_matches_through_exit_links()
+    {
+        var matcher = new AhoCorasickMatcher(["he", "she", "hers", "his"]);
+
+        var matches = matcher.FindOccurrences("ushers").ToList();
+
+        Assert.Contains(new AhoCorasickMatch("she", 1, 3), matches);
+        Assert.Contains(new AhoCorasickMatch("he", 2, 3), matches);
+        Assert.Contains(new AhoCorasickMatch("hers", 2, 5), matches);
+    }
+
+    [Fact]
     public void Matcher_returns_false_when_no_pattern_matches()
     {
         var matcher = new AhoCorasickMatcher(["spa", "villa"]);

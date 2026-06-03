@@ -141,7 +141,13 @@ test("journal search calls the article search endpoint and can reset results", (
   assert.match(dom, /function searchJournal\(query\)/);
   assert.match(dom, /const journalSearchDebounceMs = 320/);
   assert.match(dom, /function createAhoCorasickMatcher\(patterns\)/);
-  assert.match(dom, /nodes\[target\]\.failure/);
+  assert.match(dom, /go: new Map\(\), failure: 0, exit: -1/);
+  assert.match(dom, /nodes\[0\]\.go\.set\(character/);
+  assert.match(dom, /nodes\[state\]\.exit = nodes\[failure\]\.outputs\.length/);
+  assert.match(dom, /nodes\[target\]\.failure = nodes\[failure\]\.go\.get\(character\) \?\? 0/);
+  assert.match(dom, /const go = \(state, character\) => nodes\[state\]\.go\.get\(character\) \?\? 0/);
+  assert.match(dom, /const findOccurrences = \(text\) =>/);
+  assert.match(dom, /for \(let exit = nodes\[state\]\.exit; exit !== -1; exit = nodes\[exit\]\.exit\)/);
   assert.match(dom, /function queueJournalSearch\(query\)/);
   assert.match(dom, /window\.setTimeout\(\(\) => \{[\s\S]*searchJournal\(trimmedQuery\)/);
   assert.match(dom, /input\.addEventListener\("input", \(\) => \{[\s\S]*queueJournalSearch\(input\.value\)/);
