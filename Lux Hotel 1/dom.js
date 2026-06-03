@@ -33,8 +33,9 @@ const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
-const journalSearchDebounceMs = 320;
-const bookingSearchDebounceMs = 160;
+const journalSearchRenderDelayMs = 0;
+const journalApiSearchDebounceMs = 320;
+const bookingSearchDebounceMs = 0;
 const bookingFallbackRefreshMs = {
   admin: 30000,
   user: 45000,
@@ -1737,6 +1738,11 @@ function queueBookingSearchRender(query) {
     bookingSearchTimer = 0;
   }
 
+  if (bookingSearchDebounceMs <= 0) {
+    renderBookingHistory();
+    return;
+  }
+
   bookingSearchTimer = window.setTimeout(() => {
     bookingSearchTimer = 0;
     renderBookingHistory();
@@ -2083,6 +2089,25 @@ function setJournalSearchStatus(type, message) {
   status.textContent = message || "";
 }
 
+function renderLocalJournalSearch(query) {
+  const trimmedQuery = String(query || "").trim();
+  if (!trimmedQuery) {
+    journal = [...allJournalPosts];
+    setJournalSearchStatus("", "");
+    renderJournal();
+    window.ScrollTrigger?.refresh();
+    return;
+  }
+
+  journal = localJournalSearch(trimmedQuery);
+  renderJournal();
+  setJournalSearchStatus(
+    journal.length ? "success" : "warning",
+    journal.length ? t("journal.searchResults", { count: journal.length }) : t("journal.noSearchResults")
+  );
+  window.ScrollTrigger?.refresh();
+}
+
 async function searchJournal(query) {
   const searchId = ++journalSearchSequence;
   const trimmedQuery = String(query || "").trim();
@@ -2137,21 +2162,27 @@ function queueJournalSearch(query) {
   const trimmedQuery = String(query || "").trim();
   const clearButton = $("#journalSearchClear");
   if (clearButton) clearButton.hidden = !trimmedQuery;
+  journalSearchSequence += 1;
 
   if (journalSearchTimer) {
     window.clearTimeout(journalSearchTimer);
     journalSearchTimer = 0;
   }
 
+  if (journalSearchRenderDelayMs <= 0) {
+    renderLocalJournalSearch(trimmedQuery);
+  } else {
+    window.setTimeout(() => renderLocalJournalSearch(trimmedQuery), journalSearchRenderDelayMs);
+  }
+
   if (!trimmedQuery) {
-    searchJournal("");
     return;
   }
 
   journalSearchTimer = window.setTimeout(() => {
     journalSearchTimer = 0;
     searchJournal(trimmedQuery);
-  }, journalSearchDebounceMs);
+  }, journalApiSearchDebounceMs);
 }
 
 function renderGallery() {

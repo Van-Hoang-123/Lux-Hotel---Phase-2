@@ -67,6 +67,7 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(html, /data-i18n-placeholder="account\.bookingSearchPlaceholder"/);
   assert.match(dom, /let bookingSearchQuery = ""/);
   assert.match(dom, /let bookingQuickFilter = "all"/);
+  assert.match(dom, /const bookingSearchDebounceMs = 0/);
   assert.match(dom, /function bookingSearchDocument\(booking\)/);
   assert.match(dom, /function filterBookingsForAccount\(bookings, auth\)/);
   assert.match(dom, /const matcher = createAhoCorasickMatcher\(keywords\)/);
@@ -75,6 +76,7 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /Number\(canCompletePayment\(right\)\) - Number\(canCompletePayment\(left\)\)/);
   assert.match(dom, /function setupBookingSearchControls\(\)/);
   assert.match(dom, /queueBookingSearchRender\(input\.value\)/);
+  assert.match(dom, /bookingSearchDebounceMs <= 0[\s\S]*renderBookingHistory\(\)/);
   assert.match(css, /\.booking-admin-tools/);
   assert.match(css, /\.booking-history\.is-admin \.booking-list[\s\S]*max-height: min\(680px, 72vh\)/);
 });
@@ -139,7 +141,8 @@ test("journal search calls the article search endpoint and can reset results", (
   assert.match(css, /\.journal-search/);
   assert.match(css, /#journalSearchInput::-webkit-search-cancel-button/);
   assert.match(dom, /function searchJournal\(query\)/);
-  assert.match(dom, /const journalSearchDebounceMs = 320/);
+  assert.match(dom, /const journalSearchRenderDelayMs = 0/);
+  assert.match(dom, /const journalApiSearchDebounceMs = 320/);
   assert.match(dom, /function createAhoCorasickMatcher\(patterns\)/);
   assert.match(dom, /go: new Map\(\), failure: 0, exit: -1/);
   assert.match(dom, /nodes\[0\]\.go\.set\(character/);
@@ -149,7 +152,10 @@ test("journal search calls the article search endpoint and can reset results", (
   assert.match(dom, /const findOccurrences = \(text\) =>/);
   assert.match(dom, /for \(let exit = nodes\[state\]\.exit; exit !== -1; exit = nodes\[exit\]\.exit\)/);
   assert.match(dom, /function queueJournalSearch\(query\)/);
-  assert.match(dom, /window\.setTimeout\(\(\) => \{[\s\S]*searchJournal\(trimmedQuery\)/);
+  assert.match(dom, /function renderLocalJournalSearch\(query\)/);
+  assert.match(dom, /journalSearchSequence \+= 1/);
+  assert.match(dom, /journalSearchRenderDelayMs <= 0[\s\S]*renderLocalJournalSearch\(trimmedQuery\)/);
+  assert.match(dom, /window\.setTimeout\(\(\) => \{[\s\S]*searchJournal\(trimmedQuery\)[\s\S]*journalApiSearchDebounceMs/);
   assert.match(dom, /input\.addEventListener\("input", \(\) => \{[\s\S]*queueJournalSearch\(input\.value\)/);
   assert.match(dom, /\/articles\/search\?q=\$\{encodeURIComponent\(trimmedQuery\)\}/);
   assert.match(dom, /function localJournalSearch\(query\)/);
