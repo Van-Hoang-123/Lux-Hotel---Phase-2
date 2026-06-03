@@ -61,6 +61,24 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(css, /\.booking-item-actions \.payment-action/);
 });
 
+test("admin booking payments can be searched and filtered without scrolling through every booking", () => {
+  assert.match(html, /id="bookingAdminTools"[\s\S]*id="bookingSearchInput"[\s\S]*id="bookingFilterRow"/);
+  assert.match(html, /data-booking-filter="needs-payment"/);
+  assert.match(html, /data-i18n-placeholder="account\.bookingSearchPlaceholder"/);
+  assert.match(dom, /let bookingSearchQuery = ""/);
+  assert.match(dom, /let bookingQuickFilter = "all"/);
+  assert.match(dom, /function bookingSearchDocument\(booking\)/);
+  assert.match(dom, /function filterBookingsForAccount\(bookings, auth\)/);
+  assert.match(dom, /const matcher = createAhoCorasickMatcher\(keywords\)/);
+  assert.match(dom, /matcher\.find\(bookingSearchDocument\(booking\)\)/);
+  assert.match(dom, /function sortBookingsForAccount\(bookings, auth\)/);
+  assert.match(dom, /Number\(canCompletePayment\(right\)\) - Number\(canCompletePayment\(left\)\)/);
+  assert.match(dom, /function setupBookingSearchControls\(\)/);
+  assert.match(dom, /queueBookingSearchRender\(input\.value\)/);
+  assert.match(css, /\.booking-admin-tools/);
+  assert.match(css, /\.booking-history\.is-admin \.booking-list[\s\S]*max-height: min\(680px, 72vh\)/);
+});
+
 test("admin booking list shows the guest identity returned by the booking API", () => {
   assert.match(dom, /guestFullName: firstValue\(/);
   assert.match(dom, /guestEmail: firstValue\(/);
@@ -121,6 +139,8 @@ test("journal search calls the article search endpoint and can reset results", (
   assert.match(css, /\.journal-search/);
   assert.match(dom, /function searchJournal\(query\)/);
   assert.match(dom, /const journalSearchDebounceMs = 320/);
+  assert.match(dom, /function createAhoCorasickMatcher\(patterns\)/);
+  assert.match(dom, /nodes\[target\]\.failure/);
   assert.match(dom, /function queueJournalSearch\(query\)/);
   assert.match(dom, /window\.setTimeout\(\(\) => \{[\s\S]*searchJournal\(trimmedQuery\)/);
   assert.match(dom, /input\.addEventListener\("input", \(\) => \{[\s\S]*queueJournalSearch\(input\.value\)/);

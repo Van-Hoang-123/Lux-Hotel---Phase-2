@@ -1558,8 +1558,58 @@ select:focus {
     line-height: 1.05;
 }
 
+.booking-admin-tools {
+    position: sticky;
+    top: 84px;
+    z-index: 2;
+    display: grid;
+    gap: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--card);
+    box-shadow: rgba(23, 19, 15, 0.08) 0 12px 24px;
+    backdrop-filter: blur(12px);
+}
+
+.booking-admin-tools[hidden] {
+    display: none;
+}
+
+.booking-admin-tools label,
+.booking-search-count {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-transform: uppercase;
+}
+
+.booking-search-count {
+    margin: 0;
+}
+
+.booking-search-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.booking-search-row input {
+    width: 100%;
+}
+
+.booking-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .booking-history-head button,
-.booking-item-actions button {
+.booking-item-actions button,
+.booking-search-row button,
+.booking-filter-row button {
     min-height: 36px;
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -1571,8 +1621,23 @@ select:focus {
     text-transform: uppercase;
 }
 
+.booking-filter-row button.is-active {
+    border-color: var(--gold);
+    background: var(--gold);
+    color: #fff;
+}
+
 .booking-list {
     display: grid;
+}
+
+.booking-history.is-admin .booking-list {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 12px;
+    max-height: min(680px, 72vh);
+    overflow: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
 }
 
 .booking-item {
@@ -1582,9 +1647,21 @@ select:focus {
     padding: 16px 0;
 }
 
+.booking-history.is-admin .booking-item {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    background: var(--input-bg);
+}
+
 .booking-item:first-child {
     border-top: 0;
     padding-top: 4px;
+}
+
+.booking-history.is-admin .booking-item:first-child {
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
 }
 
 .booking-item-header {
@@ -2195,6 +2272,15 @@ select:focus {
         grid-template-columns: 1fr;
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .booking-search-row {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-search-row button,
+    .booking-filter-row button {
+        flex: 1 1 140px;
     }
 
     .journal-search-row {

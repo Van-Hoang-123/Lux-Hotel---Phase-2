@@ -34,6 +34,7 @@ const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
 const journalSearchDebounceMs = 320;
+const bookingSearchDebounceMs = 160;
 const bookingFallbackRefreshMs = {
   admin: 30000,
   user: 45000,
@@ -52,6 +53,9 @@ let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
 let journalSearchTimer = 0;
 let journalSearchSequence = 0;
+let bookingSearchTimer = 0;
+let bookingSearchQuery = "";
+let bookingQuickFilter = "all";
 let bookingFallbackRefreshTimer = 0;
 let bookingRealtimeConnection = null;
 let bookingRefreshInFlight = false;
@@ -261,6 +265,16 @@ const translations = {
     "account.myBookings": "My bookings",
     "account.userBookings": "User's bookings",
     "account.refreshBookings": "Refresh",
+    "account.bookingSearchLabel": "Search user bookings",
+    "account.bookingSearchPlaceholder": "Guest, email, room, status, payment, ID",
+    "account.clearBookingSearch": "Clear",
+    "account.bookingFiltersAria": "Booking filters",
+    "account.filterAllBookings": "All",
+    "account.filterNeedsPayment": "Needs payment",
+    "account.filterPaidBookings": "Paid",
+    "account.filterCancelledBookings": "Cancelled",
+    "account.bookingSearchCount": "{{shown}} of {{total}} bookings",
+    "account.noBookingMatches": "No bookings match this search.",
     "account.loadingBookings": "Loading bookings...",
     "account.noBookings": "No bookings yet.",
     "account.bookingLoadFailed": "Could not load your bookings.",
@@ -442,6 +456,16 @@ const translations = {
     "account.myBookings": "Booking của tôi",
     "account.userBookings": "Booking của user",
     "account.refreshBookings": "Tải lại",
+    "account.bookingSearchLabel": "Tìm booking của user",
+    "account.bookingSearchPlaceholder": "Khách, email, phòng, trạng thái, thanh toán, mã ID",
+    "account.clearBookingSearch": "Xóa",
+    "account.bookingFiltersAria": "Bộ lọc booking",
+    "account.filterAllBookings": "Tất cả",
+    "account.filterNeedsPayment": "Chưa thanh toán",
+    "account.filterPaidBookings": "Đã thanh toán",
+    "account.filterCancelledBookings": "Đã hủy",
+    "account.bookingSearchCount": "{{shown}} / {{total}} booking",
+    "account.noBookingMatches": "Không có booking phù hợp.",
     "account.loadingBookings": "Đang tải booking...",
     "account.noBookings": "Chưa có booking nào.",
     "account.bookingLoadFailed": "Không tải được booking của bạn.",
@@ -571,6 +595,82 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("đ", "d")
+    .replaceAll("Đ", "d")
+    .toLowerCase();
+}
+
+function searchKeywords(query, minimumLength = 2) {
+  const normalized = normalizeSearchText(query).trim();
+  if (!normalized) return [];
+
+  return [...new Set(normalized.split(/[,\s]+/).filter((keyword) => keyword.length >= minimumLength))];
+}
+
+function createAhoCorasickMatcher(patterns) {
+  const cleanedPatterns = [...new Set(
+    patterns
+      .map((pattern) => String(pattern || "").trim())
+      .filter(Boolean)
+  )];
+  const nodes = [{ next: new Map(), failure: 0, outputs: [] }];
+
+  cleanedPatterns.forEach((pattern) => {
+    let state = 0;
+    for (const character of pattern) {
+      if (!nodes[state].next.has(character)) {
+        nodes[state].next.set(character, nodes.length);
+        nodes.push({ next: new Map(), failure: 0, outputs: [] });
+      }
+      state = nodes[state].next.get(character);
+    }
+    nodes[state].outputs.push(pattern);
+  });
+
+  const queue = [...nodes[0].next.values()];
+  while (queue.length) {
+    const state = queue.shift();
+    for (const [character, target] of nodes[state].next) {
+      queue.push(target);
+      let failure = nodes[state].failure;
+      while (failure !== 0 && !nodes[failure].next.has(character)) {
+        failure = nodes[failure].failure;
+      }
+      if (nodes[failure].next.has(character)) {
+        nodes[target].failure = nodes[failure].next.get(character);
+        nodes[target].outputs.push(...nodes[nodes[target].failure].outputs);
+      }
+    }
+  }
+
+  const find = (text) => {
+    if (nodes.length === 1 || !text) return [];
+
+    const matches = [];
+    let state = 0;
+    for (const character of String(text)) {
+      while (state !== 0 && !nodes[state].next.has(character)) {
+        state = nodes[state].failure;
+      }
+      if (nodes[state].next.has(character)) {
+        state = nodes[state].next.get(character);
+      }
+      matches.push(...nodes[state].outputs);
+    }
+    return matches;
+  };
+
+  return {
+    hasPatterns: cleanedPatterns.length > 0,
+    find,
+    containsAny: (text) => find(text).length > 0,
+  };
 }
 
 function localImagePath(path, fallback = "./Images/Room - Standard.jpg") {
@@ -1407,6 +1507,106 @@ function renderAdminBookingGuest(booking, auth) {
   `;
 }
 
+function bookingRoomName(booking) {
+  const room = findRoomById(booking.roomId);
+  return booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
+}
+
+function bookingSearchDocument(booking) {
+  const room = findRoomById(booking.roomId);
+  const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+  const paymentKeywords = [
+    paymentStatus,
+    booking.paymentStatus,
+    isPaymentCompleted(booking.paymentStatus) ? "paid completed da thanh toan" : "pending unpaid chua thanh toan",
+    canCompletePayment(booking) ? `${t("account.completePayment")} needs payment complete payment` : "",
+  ];
+
+  return normalizeSearchText([
+    booking.id,
+    booking.userId,
+    booking.guestFullName,
+    booking.guestEmail,
+    bookingRoomName(booking),
+    room?.title,
+    room?.titleVi,
+    booking.status,
+    formatBookingDate(booking.arrivalDate),
+    formatBookingDate(booking.departureDate),
+    booking.arrivalDate,
+    booking.departureDate,
+    formatGuests(booking.adult, booking.children),
+    formatMoney(booking.totalPrice),
+    ...paymentKeywords,
+  ].filter(Boolean).join(" "));
+}
+
+function bookingMatchesQuickFilter(booking) {
+  if (bookingQuickFilter === "needs-payment") return canCompletePayment(booking);
+  if (bookingQuickFilter === "paid") return isPaymentCompleted(booking.paymentStatus);
+  if (bookingQuickFilter === "cancelled") return booking.status === "Cancelled";
+  return true;
+}
+
+function filterBookingsForAccount(bookings, auth) {
+  if (!userHasRole(auth, "Admin")) return [...bookings];
+
+  const quickFilteredBookings = bookings.filter(bookingMatchesQuickFilter);
+  const keywords = searchKeywords(bookingSearchQuery, 1);
+  if (!keywords.length) return quickFilteredBookings;
+
+  const matcher = createAhoCorasickMatcher(keywords);
+  return quickFilteredBookings.filter((booking) => {
+    const matches = new Set(matcher.find(bookingSearchDocument(booking)));
+    return keywords.every((keyword) => matches.has(keyword));
+  });
+}
+
+function sortBookingsForAccount(bookings, auth) {
+  if (!userHasRole(auth, "Admin")) return [...bookings];
+
+  return [...bookings].sort((left, right) => {
+    const paymentPriority = Number(canCompletePayment(right)) - Number(canCompletePayment(left));
+    if (paymentPriority !== 0) return paymentPriority;
+
+    const statusPriority = Number(right.status === "Confirmed") - Number(left.status === "Confirmed");
+    if (statusPriority !== 0) return statusPriority;
+
+    const rightDate = Date.parse(right.arrivalDate || "") || 0;
+    const leftDate = Date.parse(left.arrivalDate || "") || 0;
+    return rightDate - leftDate;
+  });
+}
+
+function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCount = myBookings.length) {
+  const tools = $("#bookingAdminTools");
+  if (!tools) return;
+
+  const isAdmin = Boolean(auth?.token) && userHasRole(auth, "Admin");
+  tools.hidden = !isAdmin || !totalCount;
+  if (!isAdmin) return;
+
+  const input = $("#bookingSearchInput");
+  if (input && input.value !== bookingSearchQuery) input.value = bookingSearchQuery;
+
+  const clearButton = $("#bookingSearchClear");
+  if (clearButton) clearButton.hidden = !bookingSearchQuery.trim();
+
+  $$("[data-booking-filter]", tools).forEach((button) => {
+    const isActive = button.dataset.bookingFilter === bookingQuickFilter;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  const count = $("#bookingSearchCount");
+  if (count) {
+    count.textContent = t("account.bookingSearchCount", {
+      shown: shownCount,
+      total: totalCount,
+    });
+  }
+}
+
 function updateBookingHistoryTitle(auth = getStoredAuth()) {
   const title = $("#bookingHistoryTitle");
   if (!title) return;
@@ -1420,27 +1620,39 @@ function renderBookingHistory(message = "") {
   if (!history || !list) return;
 
   const auth = getStoredAuth();
+  const isAdmin = userHasRole(auth, "Admin");
   updateBookingHistoryTitle(auth);
   history.hidden = !auth?.token;
+  history.classList.toggle("is-admin", Boolean(auth?.token && isAdmin));
   if (!auth?.token) {
+    updateBookingAdminTools(auth, 0, 0);
     list.innerHTML = "";
     return;
   }
 
   if (message) {
+    updateBookingAdminTools(auth, 0, myBookings.length);
     list.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
     return;
   }
 
   if (!myBookings.length) {
+    updateBookingAdminTools(auth, 0, 0);
     list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookings"))}</p>`;
     return;
   }
 
-  list.innerHTML = myBookings
+  const visibleBookings = sortBookingsForAccount(filterBookingsForAccount(myBookings, auth), auth);
+  updateBookingAdminTools(auth, visibleBookings.length, myBookings.length);
+
+  if (!visibleBookings.length) {
+    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookingMatches"))}</p>`;
+    return;
+  }
+
+  list.innerHTML = visibleBookings
     .map((booking) => {
-      const room = findRoomById(booking.roomId);
-      const roomName = booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
+      const roomName = bookingRoomName(booking);
       const status = booking.status || "Pending";
       const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
       const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
@@ -1495,6 +1707,32 @@ function bookingListSignature(bookings) {
       paidAt: booking.paidAt,
     }))
   );
+}
+
+function queueBookingSearchRender(query) {
+  bookingSearchQuery = String(query || "");
+
+  const clearButton = $("#bookingSearchClear");
+  if (clearButton) clearButton.hidden = !bookingSearchQuery.trim();
+
+  if (bookingSearchTimer) {
+    window.clearTimeout(bookingSearchTimer);
+    bookingSearchTimer = 0;
+  }
+
+  bookingSearchTimer = window.setTimeout(() => {
+    bookingSearchTimer = 0;
+    renderBookingHistory();
+  }, bookingSearchDebounceMs);
+}
+
+function resetBookingSearchState() {
+  bookingSearchQuery = "";
+  bookingQuickFilter = "all";
+  if (bookingSearchTimer) {
+    window.clearTimeout(bookingSearchTimer);
+    bookingSearchTimer = 0;
+  }
 }
 
 async function fetchMyBookings({ silent = false } = {}) {
@@ -1791,24 +2029,17 @@ function renderJournal() {
 }
 
 function normalizeJournalSearchText(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replaceAll("đ", "d")
-    .replaceAll("Đ", "d")
-    .toLowerCase();
+  return normalizeSearchText(value);
 }
 
 function journalSearchKeywords(query) {
-  const normalized = normalizeJournalSearchText(query).trim();
-  if (!normalized) return [];
-
-  return [...new Set(normalized.split(/[,\s]+/).filter((keyword) => keyword.length >= 2))];
+  return searchKeywords(query, 2);
 }
 
 function localJournalSearch(query) {
   const keywords = journalSearchKeywords(query);
   if (!keywords.length) return [...allJournalPosts];
+  const matcher = createAhoCorasickMatcher(keywords);
 
   return allJournalPosts.filter((post) => {
     const searchable = normalizeJournalSearchText([
@@ -1823,7 +2054,7 @@ function localJournalSearch(query) {
       post.copyVi,
     ].filter(Boolean).join(" "));
 
-    return keywords.some((keyword) => searchable.includes(keyword));
+    return matcher.containsAny(searchable);
   });
 }
 
@@ -2516,6 +2747,41 @@ async function submitAuthForm(form, mode) {
   }
 }
 
+function setupBookingSearchControls() {
+  const input = $("#bookingSearchInput");
+  const clearButton = $("#bookingSearchClear");
+  const filterRow = $("#bookingFilterRow");
+
+  input?.addEventListener("input", () => {
+    queueBookingSearchRender(input.value);
+  });
+
+  clearButton?.addEventListener("click", () => {
+    bookingSearchQuery = "";
+    if (bookingSearchTimer) {
+      window.clearTimeout(bookingSearchTimer);
+      bookingSearchTimer = 0;
+    }
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+    renderBookingHistory();
+  });
+
+  filterRow?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-booking-filter]");
+    if (!button) return;
+
+    if (bookingSearchTimer) {
+      window.clearTimeout(bookingSearchTimer);
+      bookingSearchTimer = 0;
+    }
+    bookingQuickFilter = button.dataset.bookingFilter || "all";
+    renderBookingHistory();
+  });
+}
+
 function setupAuthForms() {
   if (!$("#loginForm") || !$("#registerForm")) return;
 
@@ -2545,6 +2811,7 @@ function setupAuthForms() {
   $("#logoutButton").addEventListener("click", () => {
     stopBookingAutoRefresh();
     clearStoredAuth();
+    resetBookingSearchState();
     myBookings = [];
     lastBookingsSignature = "";
     switchAuthPanel("login");
@@ -2554,6 +2821,7 @@ function setupAuthForms() {
   });
 
   $("#refreshBookings")?.addEventListener("click", () => fetchMyBookings());
+  setupBookingSearchControls();
   $("#bookingList")?.addEventListener("click", (event) => {
     const paymentButton = event.target.closest("[data-complete-payment]");
     if (paymentButton) {
