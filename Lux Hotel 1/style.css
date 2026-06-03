@@ -28,6 +28,11 @@
     --toast-error-bg: #fff8f7;
     --toast-success-bg: #f4fbf7;
     --toast-warning-bg: #fffaf0;
+    --journal-search-submit-bg: var(--gold);
+    --journal-search-submit-text: var(--deep);
+    --journal-search-submit-border: transparent;
+    --journal-search-submit-hover-bg: var(--gold-dark);
+    --journal-search-submit-hover-text: var(--paper);
     --font-body: "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-display: "Noto Serif", Georgia, "Times New Roman", serif;
     --container: 1180px;
@@ -64,6 +69,11 @@
     --toast-error-bg: #271310;
     --toast-success-bg: #102218;
     --toast-warning-bg: #241d12;
+    --journal-search-submit-bg: var(--card);
+    --journal-search-submit-text: var(--gold-dark);
+    --journal-search-submit-border: var(--gold);
+    --journal-search-submit-hover-bg: var(--gold);
+    --journal-search-submit-hover-text: var(--deep);
 }
 
 * {
@@ -985,14 +995,15 @@ select:focus {
 }
 
 .journal-search button[type="submit"] {
-    border-color: transparent;
-    background: var(--gold);
-    color: var(--deep);
+    border-color: var(--journal-search-submit-border);
+    background: var(--journal-search-submit-bg);
+    color: var(--journal-search-submit-text);
 }
 
 .journal-search button[type="submit"]:hover {
-    border-color: transparent;
-    background: var(--gold-dark);
+    border-color: var(--journal-search-submit-border);
+    background: var(--journal-search-submit-hover-bg);
+    color: var(--journal-search-submit-hover-text);
     transform: translateY(-1px);
 }
 
