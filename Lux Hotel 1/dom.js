@@ -36,6 +36,8 @@ const maxGuestCount = 20;
 const journalSearchRenderDelayMs = 0;
 const journalApiSearchDebounceMs = 320;
 const bookingSearchDebounceMs = 0;
+const adminBookingInitialRenderLimit = 120;
+const adminBookingRenderStep = 120;
 const bookingFallbackRefreshMs = {
   admin: 30000,
   user: 45000,
@@ -57,6 +59,8 @@ let journalSearchSequence = 0;
 let bookingSearchTimer = 0;
 let bookingSearchQuery = "";
 let bookingQuickFilter = "all";
+let bookingRenderLimit = adminBookingInitialRenderLimit;
+const bookingSearchDocumentCache = new Map();
 let bookingFallbackRefreshTimer = 0;
 let bookingRealtimeConnection = null;
 let bookingRefreshInFlight = false;
@@ -275,6 +279,8 @@ const translations = {
     "account.filterPaidBookings": "Paid",
     "account.filterCancelledBookings": "Cancelled",
     "account.bookingSearchCount": "{{shown}} of {{total}} bookings",
+    "account.bookingVisibleCount": "Showing {{visible}} of {{shown}} matches.",
+    "account.loadMoreBookings": "Show more",
     "account.noBookingMatches": "No bookings match this search.",
     "account.loadingBookings": "Loading bookings...",
     "account.noBookings": "No bookings yet.",
@@ -466,6 +472,8 @@ const translations = {
     "account.filterPaidBookings": "Đã thanh toán",
     "account.filterCancelledBookings": "Đã hủy",
     "account.bookingSearchCount": "{{shown}} / {{total}} booking",
+    "account.bookingVisibleCount": "Đang hiện {{visible}} / {{shown}} kết quả.",
+    "account.loadMoreBookings": "Hiện thêm",
     "account.noBookingMatches": "Không có booking phù hợp.",
     "account.loadingBookings": "Đang tải booking...",
     "account.noBookings": "Chưa có booking nào.",
@@ -1531,6 +1539,8 @@ function bookingRoomName(booking) {
 }
 
 function bookingSearchDocument(booking) {
+  if (bookingSearchDocumentCache.has(booking.id)) return bookingSearchDocumentCache.get(booking.id);
+
   const room = findRoomById(booking.roomId);
   const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
   const paymentKeywords = [
@@ -1540,7 +1550,7 @@ function bookingSearchDocument(booking) {
     canCompletePayment(booking) ? `${t("account.completePayment")} needs payment complete payment` : "",
   ];
 
-  return normalizeSearchText([
+  const documentText = normalizeSearchText([
     booking.id,
     booking.userId,
     booking.guestFullName,
@@ -1557,6 +1567,8 @@ function bookingSearchDocument(booking) {
     formatMoney(booking.totalPrice),
     ...paymentKeywords,
   ].filter(Boolean).join(" "));
+  bookingSearchDocumentCache.set(booking.id, documentText);
+  return documentText;
 }
 
 function bookingMatchesQuickFilter(booking) {
@@ -1596,7 +1608,44 @@ function sortBookingsForAccount(bookings, auth) {
   });
 }
 
-function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCount = myBookings.length) {
+function renderBookingItem(booking, auth = getStoredAuth()) {
+  const roomName = bookingRoomName(booking);
+  const status = booking.status || "Pending";
+  const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
+  const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+  const paymentStatusMarkup = paymentStatus
+    ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
+    : "";
+  const guestInfoMarkup = renderAdminBookingGuest(booking, auth);
+  const paymentActionMarkup = canCompletePayment(booking)
+    ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
+    : "";
+
+  return `
+    <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
+      <div class="booking-item-header">
+        <div>
+          <p class="booking-item-kicker">${escapeHtml(t("account.bookingDates", {
+            arrival: formatBookingDate(booking.arrivalDate),
+            departure: formatBookingDate(booking.departureDate),
+          }))}</p>
+          <h3>${escapeHtml(roomName)}</h3>
+        </div>
+        <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
+      </div>
+      ${guestInfoMarkup}
+      <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
+      <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
+      ${paymentStatusMarkup}
+      <div class="booking-item-actions">
+        ${paymentActionMarkup}
+        <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
+      </div>
+    </article>
+  `;
+}
+
+function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCount = myBookings.length, visibleCount = shownCount) {
   const tools = $("#bookingAdminTools");
   if (!tools) return;
 
@@ -1618,10 +1667,14 @@ function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCo
 
   const count = $("#bookingSearchCount");
   if (count) {
-    count.textContent = t("account.bookingSearchCount", {
+    const totalText = t("account.bookingSearchCount", {
       shown: shownCount,
       total: totalCount,
     });
+    const visibleText = shownCount > visibleCount
+      ? ` ${t("account.bookingVisibleCount", { visible: visibleCount, shown: shownCount })}`
+      : "";
+    count.textContent = `${totalText}${visibleText}`;
   }
 }
 
@@ -1660,51 +1713,21 @@ function renderBookingHistory(message = "") {
     return;
   }
 
-  const visibleBookings = sortBookingsForAccount(filterBookingsForAccount(myBookings, auth), auth);
-  updateBookingAdminTools(auth, visibleBookings.length, myBookings.length);
+  const matchedBookings = sortBookingsForAccount(filterBookingsForAccount(myBookings, auth), auth);
+  const renderLimit = isAdmin ? Math.min(bookingRenderLimit, matchedBookings.length) : matchedBookings.length;
+  const visibleBookings = matchedBookings.slice(0, renderLimit);
+  updateBookingAdminTools(auth, matchedBookings.length, myBookings.length, visibleBookings.length);
 
-  if (!visibleBookings.length) {
+  if (!matchedBookings.length) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookingMatches"))}</p>`;
     return;
   }
 
-  list.innerHTML = visibleBookings
-    .map((booking) => {
-      const roomName = bookingRoomName(booking);
-      const status = booking.status || "Pending";
-      const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
-      const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
-      const paymentStatusMarkup = paymentStatus
-        ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
-        : "";
-      const guestInfoMarkup = renderAdminBookingGuest(booking, auth);
-      const paymentActionMarkup = canCompletePayment(booking)
-        ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
-        : "";
-      return `
-        <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
-          <div class="booking-item-header">
-            <div>
-              <p class="booking-item-kicker">${escapeHtml(t("account.bookingDates", {
-                arrival: formatBookingDate(booking.arrivalDate),
-                departure: formatBookingDate(booking.departureDate),
-              }))}</p>
-              <h3>${escapeHtml(roomName)}</h3>
-            </div>
-            <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
-          </div>
-          ${guestInfoMarkup}
-          <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
-          <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
-          ${paymentStatusMarkup}
-          <div class="booking-item-actions">
-            ${paymentActionMarkup}
-            <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
+  const loadMoreMarkup = isAdmin && matchedBookings.length > visibleBookings.length
+    ? `<button class="booking-load-more" type="button" data-load-more-bookings>${escapeHtml(t("account.loadMoreBookings"))}</button>`
+    : "";
+
+  list.innerHTML = `${visibleBookings.map((booking) => renderBookingItem(booking, auth)).join("")}${loadMoreMarkup}`;
 }
 
 function bookingListSignature(bookings) {
@@ -1729,6 +1752,7 @@ function bookingListSignature(bookings) {
 
 function queueBookingSearchRender(query) {
   bookingSearchQuery = String(query || "");
+  bookingRenderLimit = adminBookingInitialRenderLimit;
 
   const clearButton = $("#bookingSearchClear");
   if (clearButton) clearButton.hidden = !bookingSearchQuery.trim();
@@ -1752,6 +1776,7 @@ function queueBookingSearchRender(query) {
 function resetBookingSearchState() {
   bookingSearchQuery = "";
   bookingQuickFilter = "all";
+  bookingRenderLimit = adminBookingInitialRenderLimit;
   if (bookingSearchTimer) {
     window.clearTimeout(bookingSearchTimer);
     bookingSearchTimer = 0;
@@ -1811,6 +1836,10 @@ async function fetchMyBookings({ silent = false } = {}) {
       .filter((booking) => booking.id);
     const nextSignature = bookingListSignature(nextBookings);
     const hasChanged = nextSignature !== lastBookingsSignature;
+    if (hasChanged) {
+      bookingSearchDocumentCache.clear();
+      bookingRenderLimit = adminBookingInitialRenderLimit;
+    }
     myBookings = nextBookings;
     lastBookingsSignature = nextSignature;
     if (!silent || hasChanged) renderBookingHistory();
@@ -2806,6 +2835,7 @@ function setupBookingSearchControls() {
 
   clearButton?.addEventListener("click", () => {
     bookingSearchQuery = "";
+    bookingRenderLimit = adminBookingInitialRenderLimit;
     if (bookingSearchTimer) {
       window.clearTimeout(bookingSearchTimer);
       bookingSearchTimer = 0;
@@ -2826,6 +2856,7 @@ function setupBookingSearchControls() {
       bookingSearchTimer = 0;
     }
     bookingQuickFilter = button.dataset.bookingFilter || "all";
+    bookingRenderLimit = adminBookingInitialRenderLimit;
     renderBookingHistory();
   });
 }
@@ -2871,6 +2902,13 @@ function setupAuthForms() {
   $("#refreshBookings")?.addEventListener("click", () => fetchMyBookings());
   setupBookingSearchControls();
   $("#bookingList")?.addEventListener("click", (event) => {
+    const loadMoreButton = event.target.closest("[data-load-more-bookings]");
+    if (loadMoreButton) {
+      bookingRenderLimit += adminBookingRenderStep;
+      renderBookingHistory();
+      return;
+    }
+
     const paymentButton = event.target.closest("[data-complete-payment]");
     if (paymentButton) {
       completePayment(paymentButton.dataset.completePayment, paymentButton);

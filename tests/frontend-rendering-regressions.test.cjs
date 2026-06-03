@@ -68,16 +68,24 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /let bookingSearchQuery = ""/);
   assert.match(dom, /let bookingQuickFilter = "all"/);
   assert.match(dom, /const bookingSearchDebounceMs = 0/);
+  assert.match(dom, /const adminBookingInitialRenderLimit = 120/);
+  assert.match(dom, /const adminBookingRenderStep = 120/);
+  assert.match(dom, /const bookingSearchDocumentCache = new Map\(\)/);
   assert.match(dom, /function bookingSearchDocument\(booking\)/);
+  assert.match(dom, /bookingSearchDocumentCache\.has\(booking\.id\)/);
   assert.match(dom, /function filterBookingsForAccount\(bookings, auth\)/);
   assert.match(dom, /const matcher = createAhoCorasickMatcher\(keywords\)/);
   assert.match(dom, /matcher\.find\(bookingSearchDocument\(booking\)\)/);
+  assert.match(dom, /const renderLimit = isAdmin \? Math\.min\(bookingRenderLimit, matchedBookings\.length\) : matchedBookings\.length/);
+  assert.match(dom, /data-load-more-bookings/);
+  assert.match(dom, /bookingRenderLimit \+= adminBookingRenderStep/);
   assert.match(dom, /function sortBookingsForAccount\(bookings, auth\)/);
   assert.match(dom, /Number\(canCompletePayment\(right\)\) - Number\(canCompletePayment\(left\)\)/);
   assert.match(dom, /function setupBookingSearchControls\(\)/);
   assert.match(dom, /queueBookingSearchRender\(input\.value\)/);
   assert.match(dom, /bookingSearchDebounceMs <= 0[\s\S]*renderBookingHistory\(\)/);
   assert.match(css, /\.booking-admin-tools/);
+  assert.match(css, /\.booking-load-more/);
   assert.match(css, /\.booking-history\.is-admin \.booking-list[\s\S]*max-height: min\(680px, 72vh\)/);
 });
 

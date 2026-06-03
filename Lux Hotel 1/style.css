@@ -1770,6 +1770,21 @@ select:focus {
     background: var(--gold-dark);
 }
 
+.booking-load-more {
+    min-height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.booking-history.is-admin .booking-load-more {
+    grid-column: 1 / -1;
+}
+
 .auth-shell .form-status {
     margin-top: 14px;
 }
