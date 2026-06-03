@@ -219,6 +219,14 @@ const translations = {
     "journal.defaultTitle": "Lux Hotel Journal",
     "journal.defaultTag": "Journal",
     "journal.defaultCopy": "Stories from the island.",
+    "journal.searchLabel": "Search stories",
+    "journal.searchPlaceholder": "Try style, island, comfort",
+    "journal.searchButton": "Search",
+    "journal.clearSearch": "Clear",
+    "journal.loadingSearch": "Searching stories...",
+    "journal.searchResults": "Found {{count}} matching stories.",
+    "journal.noSearchResults": "No stories match that search.",
+    "journal.searchFailed": "Could not search stories.",
     "account.eyebrow": "Guest account",
     "account.title": "Manage your Lux Hotel stay.",
     "account.summarySignedOut": "Sign in to keep your booking profile ready before arrival.",
@@ -393,6 +401,14 @@ const translations = {
     "journal.defaultTitle": "Nhật ký Lux Hotel",
     "journal.defaultTag": "Nhật ký",
     "journal.defaultCopy": "Câu chuyện từ hòn đảo.",
+    "journal.searchLabel": "Tìm câu chuyện",
+    "journal.searchPlaceholder": "Thử phong cách, hòn đảo, thoải mái",
+    "journal.searchButton": "Tìm",
+    "journal.clearSearch": "Xóa",
+    "journal.loadingSearch": "Đang tìm câu chuyện...",
+    "journal.searchResults": "Tìm thấy {{count}} câu chuyện phù hợp.",
+    "journal.noSearchResults": "Không có câu chuyện phù hợp.",
+    "journal.searchFailed": "Không tìm được câu chuyện.",
     "account.eyebrow": "Tài khoản khách",
     "account.title": "Quản lý kỳ nghỉ Lux Hotel.",
     "account.summarySignedOut": "Đăng nhập để chuẩn bị hồ sơ đặt phòng trước ngày đến.",
@@ -1110,6 +1126,7 @@ const fallbackJournal = [
 ];
 
 let journal = [...fallbackJournal];
+let allJournalPosts = [...fallbackJournal];
 
 function journalKey(post) {
   return String(post?.slug || post?.title || "").trim().toLowerCase();
@@ -1748,7 +1765,15 @@ function renderReviews() {
 }
 
 function renderJournal() {
-  $("#journalGrid").innerHTML = journal
+  const grid = $("#journalGrid");
+  if (!grid) return;
+
+  if (!journal.length) {
+    grid.innerHTML = `<p class="empty-state">${escapeHtml(t("journal.noSearchResults"))}</p>`;
+    return;
+  }
+
+  grid.innerHTML = journal
     .map(
       (post) => `
         <article class="journal-card">
@@ -1762,6 +1787,96 @@ function renderJournal() {
       `
     )
     .join("");
+}
+
+function normalizeJournalSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("đ", "d")
+    .replaceAll("Đ", "d")
+    .toLowerCase();
+}
+
+function journalSearchKeywords(query) {
+  const normalized = normalizeJournalSearchText(query).trim();
+  if (!normalized) return [];
+
+  return [...new Set(normalized.split(/[,\s]+/).filter((keyword) => keyword.length >= 2))];
+}
+
+function localJournalSearch(query) {
+  const keywords = journalSearchKeywords(query);
+  if (!keywords.length) return [...allJournalPosts];
+
+  return allJournalPosts.filter((post) => {
+    const searchable = normalizeJournalSearchText([
+      localized(post, "title"),
+      localized(post, "tag"),
+      localized(post, "copy"),
+      post.title,
+      post.tag,
+      post.copy,
+      post.titleVi,
+      post.tagVi,
+      post.copyVi,
+    ].filter(Boolean).join(" "));
+
+    return keywords.some((keyword) => searchable.includes(keyword));
+  });
+}
+
+function setJournalSearchStatus(type, message) {
+  const status = $("#journalSearchStatus");
+  if (!status) return;
+
+  status.className = `form-status ${type ? `is-visible ${type}` : ""}`;
+  status.textContent = message || "";
+}
+
+async function searchJournal(query) {
+  const trimmedQuery = String(query || "").trim();
+  const clearButton = $("#journalSearchClear");
+  if (clearButton) clearButton.hidden = !trimmedQuery;
+
+  if (!trimmedQuery) {
+    journal = [...allJournalPosts];
+    setJournalSearchStatus("", "");
+    renderJournal();
+    window.ScrollTrigger?.refresh();
+    return;
+  }
+
+  setJournalSearchStatus("warning", t("journal.loadingSearch"));
+
+  try {
+    const response = await apiFetch(`/articles/search?q=${encodeURIComponent(trimmedQuery)}`, {
+      returnStatuses: [400, 404, 500],
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      throw new Error(formatApiError(data, t("journal.searchFailed")));
+    }
+
+    const apiPosts = apiContract.readItems(data).map(normalizeArticle);
+    journal = apiPosts.length ? apiPosts : localJournalSearch(trimmedQuery);
+    renderJournal();
+    setJournalSearchStatus(
+      journal.length ? "success" : "warning",
+      journal.length ? t("journal.searchResults", { count: journal.length }) : t("journal.noSearchResults")
+    );
+    window.ScrollTrigger?.refresh();
+  } catch (error) {
+    console.warn("Using local journal search because the API search is unavailable.", error);
+    journal = localJournalSearch(trimmedQuery);
+    renderJournal();
+    setJournalSearchStatus(
+      journal.length ? "success" : "warning",
+      journal.length ? t("journal.searchResults", { count: journal.length }) : t("journal.searchFailed")
+    );
+    window.ScrollTrigger?.refresh();
+  }
 }
 
 function renderGallery() {
@@ -1828,7 +1943,8 @@ async function fetchArticles() {
     const articles = apiContract.readItems(data);
     if (!articles.length) return;
 
-    journal = completeJournalPosts(articles.map(normalizeArticle));
+    allJournalPosts = completeJournalPosts(articles.map(normalizeArticle));
+    journal = [...allJournalPosts];
     renderJournal();
     window.ScrollTrigger?.refresh();
   } catch (error) {
@@ -2424,6 +2540,30 @@ function setupAuthForms() {
   });
 }
 
+function setupJournalSearch() {
+  const form = $("#journalSearchForm");
+  const input = $("#journalSearchInput");
+  const clearButton = $("#journalSearchClear");
+  if (!form || !input) return;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    searchJournal(input.value);
+  });
+
+  input.addEventListener("input", () => {
+    const hasQuery = Boolean(input.value.trim());
+    if (clearButton) clearButton.hidden = !hasQuery;
+    if (!hasQuery) searchJournal("");
+  });
+
+  clearButton?.addEventListener("click", () => {
+    input.value = "";
+    input.focus();
+    searchJournal("");
+  });
+}
+
 function readBookingFormValues() {
   return {
     arrival: $("#arrivalDate").value,
@@ -2822,6 +2962,7 @@ setupHeader();
 setupHeroSlider();
 setupExperience();
 setupAuthForms();
+setupJournalSearch();
 setupForms();
 setupBackToTop();
 setupRoomModal();

@@ -1,11 +1,14 @@
 ﻿using Azure.Core;
 using LuxHotel.Application.Dtos;
+using LuxHotel.Application.Search;
 using LuxHotel.Domain.Entities;
 using LuxHotel.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
+using System.Text;
 
 namespace LuxHotel.Api.Controllers
 {
@@ -13,6 +16,7 @@ namespace LuxHotel.Api.Controllers
     [ApiController]
     public class ArticlesController : ControllerBase
     {
+        private const int MaxSearchKeywords = 24;
         private readonly LuxHotelDbContext _context;
         public ArticlesController(LuxHotelDbContext context)
         {
@@ -66,6 +70,24 @@ namespace LuxHotel.Api.Controllers
             return Ok(new PagedResultDTO<Article>(articles, totalItems, pageNumber, pageSize));
         }
         // Filters
+        [HttpGet("/api/articles/search")]
+        public async Task<ActionResult<List<Article>>> searchArticles([FromQuery] string? q)
+        {
+            var keywords = ParseSearchKeywords(q);
+            if (keywords.Count == 0)
+            {
+                return BadRequest(new { message = "Search keywords are required." });
+            }
+
+            var matcher = new AhoCorasickMatcher(keywords);
+            var articles = await _context.Articles.AsNoTracking().ToListAsync();
+            var matches = articles
+                .Where(article => matcher.ContainsAny(NormalizeArticleSearchText(article)))
+                .ToList();
+
+            return Ok(matches);
+        }
+
         [HttpGet("/api/articles/getByTitle/{title}")]
 
         public async Task<ActionResult<List<Article>>> getArticlesByTitle(string title)
@@ -184,6 +206,60 @@ namespace LuxHotel.Api.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Delete successfully" });
+        }
+
+        private static IReadOnlyList<string> ParseSearchKeywords(string? query)
+        {
+            var normalized = NormalizeSearchText(query);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return [];
+            }
+
+            return normalized
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .SelectMany(part =>
+                {
+                    var words = part.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    return words.Length > 1 ? words.Prepend(part) : words;
+                })
+                .Where(keyword => keyword.Length >= 2)
+                .Distinct()
+                .Take(MaxSearchKeywords)
+                .ToList();
+        }
+
+        private static string NormalizeArticleSearchText(Article article)
+        {
+            return NormalizeSearchText(string.Join(' ', article.Title, article.Category, article.Summary, article.Content));
+        }
+
+        private static string NormalizeSearchText(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var normalized = value.Normalize(NormalizationForm.FormD);
+            var builder = new StringBuilder(normalized.Length);
+            foreach (var character in normalized)
+            {
+                if (character is 'đ' or 'Đ')
+                {
+                    builder.Append('d');
+                    continue;
+                }
+
+                if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
+                {
+                    continue;
+                }
+
+                builder.Append(char.ToLowerInvariant(character));
+            }
+
+            return builder.ToString().Normalize(NormalizationForm.FormC);
         }
     }
 }

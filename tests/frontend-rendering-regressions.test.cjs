@@ -113,3 +113,14 @@ test("account login and register UI is not hidden by scroll reveal animations", 
   assert.doesNotMatch(dom, /gsap\.utils\.toArray\([^)]*account-copy/);
   assert.doesNotMatch(dom, /gsap\.utils\.toArray\([^)]*auth-shell/);
 });
+
+test("journal search calls the article search endpoint and can reset results", () => {
+  assert.match(html, /id="journalSearchForm"[\s\S]*id="journalSearchInput"[\s\S]*id="journalSearchClear"/);
+  assert.match(html, /data-i18n-placeholder="journal\.searchPlaceholder"/);
+  assert.match(css, /\.journal-search/);
+  assert.match(dom, /function searchJournal\(query\)/);
+  assert.match(dom, /\/articles\/search\?q=\$\{encodeURIComponent\(trimmedQuery\)\}/);
+  assert.match(dom, /function localJournalSearch\(query\)/);
+  assert.match(dom, /journal = \[\.\.\.allJournalPosts\]/);
+  assert.match(dom, /setupJournalSearch\(\);/);
+});
