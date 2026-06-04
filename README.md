@@ -900,3 +900,7 @@ Lux-Hotel---Phase-2/
 │   └── style.css
 └── README.md
 ```
+
+## 14. Database ERD
+
+![ERD](ERD.jpg)
