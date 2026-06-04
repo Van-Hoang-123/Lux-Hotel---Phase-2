@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "..");
 const css = fs.readFileSync(path.join(root, "Lux Hotel 1", "style.css"), "utf8");
 const dom = fs.readFileSync(path.join(root, "Lux Hotel 1", "dom.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "Lux Hotel 1", "index.html"), "utf8");
+const bookingWorker = fs.readFileSync(path.join(root, "Lux Hotel 1", "booking-search-worker.js"), "utf8");
 
 test("booking form has a wide tablet breakpoint before the iPad layout squeezes", () => {
   assert.match(css, /@media \(max-width: 1240px\)[\s\S]*?\.booking-form[\s\S]*?repeat\(3, minmax\(0, 1fr\)\)/);
@@ -16,6 +17,7 @@ test("frontend images do not use lazy loading or delayed background observers", 
   assert.doesNotMatch(html, /loading="lazy"/);
   assert.doesNotMatch(dom, /loading="lazy"/);
   assert.doesNotMatch(dom, /IntersectionObserver/);
+  assert.doesNotMatch(html, /gsap@|ScrollTrigger/);
   assert.match(dom, /function setupBackgroundImages\(root = document\)/);
 
   const contentVisibilityBlock = css.match(/\.intro-section,[\s\S]*?content-visibility: auto;/)?.[0] || "";
@@ -71,24 +73,28 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /const adminBookingInitialRenderLimit = 120/);
   assert.match(dom, /const adminBookingRenderStep = 120/);
   assert.match(dom, /const adminBookingAsyncThreshold = 800/);
-  assert.match(dom, /const adminBookingFilterBatchSize = 96/);
-  assert.match(dom, /const adminBookingPrecomputeIdleTimeoutMs = 1200/);
   assert.match(dom, /const bookingSearchDocumentCache = new Map\(\)/);
   assert.match(dom, /let bookingRenderSequence = 0/);
   assert.match(dom, /let lastSortedBookingsKey = ""/);
-  assert.match(dom, /"account\.bookingFilterProgress": "Scanning \{\{processed\}\} of \{\{total\}\} bookings\. \{\{matched\}\} matches so far\."/);
+  assert.match(dom, /let bookingSearchWorker = null/);
+  assert.match(dom, /const frontendAssetVersion = "20260604-booking-worker-no-lazy"/);
+  assert.doesNotMatch(dom, /account\.bookingFilterProgress/);
+  assert.doesNotMatch(dom, /function updateBookingFilterProgress/);
+  assert.doesNotMatch(dom, /function precomputeBookingSearchDocuments/);
+  assert.doesNotMatch(dom, /requestIdleCallback/);
   assert.match(dom, /function bookingSearchDocument\(booking, auth = getStoredAuth\(\)\)/);
   assert.match(dom, /const cacheKey = `\$\{currentLanguage\}\|\$\{paymentApiAvailable \? "payment" : "no-payment"\}\|\$\{booking\.id\}`/);
   assert.match(dom, /bookingSearchDocumentCache\.has\(cacheKey\)/);
   assert.match(dom, /function sortedBookingsForAccount\(bookings, auth = getStoredAuth\(\)\)/);
-  assert.match(dom, /function updateBookingFilterProgress\(auth, matchedCount, totalCount, processedCount\)/);
-  assert.match(dom, /account\.bookingFilterProgress/);
-  assert.match(dom, /function precomputeBookingSearchDocuments\(bookings, auth = getStoredAuth\(\)\)/);
-  assert.match(dom, /requestIdleCallback/);
+  assert.match(dom, /function bookingSearchWorkerEntry\(booking, auth\)/);
+  assert.match(dom, /new Worker\(`booking-search-worker\.js\?v=\$\{frontendAssetVersion\}`\)/);
+  assert.match(dom, /function syncBookingSearchWorker\(bookings, auth = getStoredAuth\(\)\)/);
   assert.match(dom, /function renderBookingHistoryAsync\(bookings, auth, list\)/);
-  assert.match(dom, /window\.setTimeout\(step, 0\)/);
-  assert.match(dom, /updateBookingFilterProgress\(auth, 0, sortedBookings\.length, 0\)/);
-  assert.match(dom, /updateBookingFilterProgress\(auth, matches\.length, sortedBookings\.length, index\)/);
+  assert.match(dom, /workerState\.worker\.postMessage\(\{/);
+  assert.match(bookingWorker, /function createAhoCorasickMatcher\(patterns\)/);
+  assert.match(bookingWorker, /self\.onmessage/);
+  assert.match(bookingWorker, /type: "result"/);
+  assert.match(bookingWorker, /ids/);
   assert.match(dom, /function filterBookingsForAccount\(bookings, auth\)/);
   assert.match(dom, /const matcher = createAhoCorasickMatcher\(keywords\)/);
   assert.match(dom, /matcher\.find\(bookingSearchDocument\(booking, auth\)\)/);
@@ -99,7 +105,7 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /Number\(canCompletePayment\(right, auth\)\) - Number\(canCompletePayment\(left, auth\)\)/);
   assert.match(dom, /function setupBookingSearchControls\(\)/);
   assert.match(dom, /queueBookingSearchRender\(input\.value\)/);
-  assert.match(dom, /function queueBookingSearchRender\(query\)[\s\S]*stopBookingSearchPrecompute\(\)/);
+  assert.doesNotMatch(dom, /stopBookingSearchPrecompute/);
   assert.match(dom, /bookingSearchDebounceMs <= 0[\s\S]*renderBookingHistory\(\)/);
   assert.match(dom, /myBookings\.length > adminBookingAsyncThreshold[\s\S]*renderBookingHistoryAsync\(myBookings, auth, list\)/);
   assert.match(css, /\.booking-admin-tools/);
