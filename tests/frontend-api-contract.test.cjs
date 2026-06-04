@@ -11,7 +11,7 @@ const {
   readItems,
 } = require("../Lux Hotel 1/api-contract.js");
 
-test("formatDateForApi sends dates in the deployed backend yyyy-MM-dd format", () => {
+test("formatDateForApi normalizes dates and legacy formatter matches the .NET backend converter", () => {
   assert.equal(formatDateForApi("2026-06-03"), "2026-06-03");
   assert.equal(formatDateForApi("03-06-2026"), "2026-06-03");
   assert.equal(formatDateForApi("03-Jun-2026"), "2026-06-03");
@@ -29,14 +29,14 @@ test("buildAvailabilityPayload matches the booking availability API", () => {
 
   assert.deepEqual(payload, {
     roomId: 3,
-    arrivalDate: "2026-06-03",
-    departureDate: "2026-06-05",
+    arrivalDate: "03-06-2026",
+    departureDate: "05-06-2026",
+    adult: 2,
+    adults: 2,
     adultCount: 2,
+    children: 1,
     childCount: 1,
   });
-  assert.equal(Object.hasOwn(payload, "adult"), false);
-  assert.equal(Object.hasOwn(payload, "adults"), false);
-  assert.equal(Object.hasOwn(payload, "children"), false);
 });
 
 test("buildBookingPayload matches the authenticated booking API", () => {
@@ -54,9 +54,12 @@ test("buildBookingPayload matches the authenticated booking API", () => {
       roomId: 3,
       guestFullName: "Vivu Nguyen",
       guestEmail: "vivu@example.com",
-      arrivalDate: "2026-06-03",
-      departureDate: "2026-06-05",
+      arrivalDate: "03-06-2026",
+      departureDate: "05-06-2026",
+      adult: 2,
+      adults: 2,
       adultCount: 2,
+      children: 1,
       childCount: 1,
     }
   );

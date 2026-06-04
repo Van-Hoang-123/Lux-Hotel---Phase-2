@@ -6,6 +6,8 @@ Desktop.ini
 # AI assistant context files (personal — not team docs)
 CLAUDE.md
 .claude/
+.codex/
+.agents/
 
 # Editors / IDEs
 .vscode/
@@ -25,6 +27,7 @@ logs/
 .env.*
 appsettings.Development.json
 appsettings.*.local.json
+Data/
 
 # Node / frontend tooling
 node_modules/

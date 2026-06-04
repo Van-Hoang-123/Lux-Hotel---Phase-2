@@ -24,12 +24,16 @@ namespace LuxHotel.Infrastructure.Repositories
             {
             IQueryable<Room> query = _context.Rooms;
             bool desc = order == SortOrder.Desc;
+            if (sortBy == RoomSortBy.PricePerNight)
+            {
+                var rooms = await query.ToListAsync();
+                return desc
+                    ? rooms.OrderByDescending(r => r.PricePerNight)
+                    : rooms.OrderBy(r => r.PricePerNight);
+            }
+
             query = sortBy switch
             {
-                RoomSortBy.PricePerNight => desc
-                    ? query.OrderByDescending(r => r.PricePerNight)
-                    : query.OrderBy(r => r.PricePerNight),
-
                 RoomSortBy.Capacity => desc
                     ? query.OrderByDescending(r => r.Capacity)
                     : query.OrderBy(r => r.Capacity),

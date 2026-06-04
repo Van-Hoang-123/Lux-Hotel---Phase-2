@@ -33,6 +33,18 @@ const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
+const journalSearchRenderDelayMs = 0;
+const journalApiSearchDebounceMs = 320;
+const bookingSearchDebounceMs = 0;
+const adminBookingInitialRenderLimit = 120;
+const adminBookingRenderStep = 120;
+const adminBookingAsyncThreshold = 800;
+const adminBookingFilterBatchSize = 96;
+const adminBookingPrecomputeIdleTimeoutMs = 1200;
+const bookingFallbackRefreshMs = {
+  admin: 30000,
+  user: 45000,
+};
 const authEndpointPaths = {
   login: ["/auth/login", "/Auth/login"],
   register: ["/auth/register", "/Auth/register"],
@@ -46,6 +58,25 @@ let currentTheme = localStorage.getItem(themeStorageKey) === "night" ? "night" :
 let paymentApiAvailable = false;
 let paymentApiProbeStarted = false;
 let pendingCancelBooking = null;
+let journalSearchTimer = 0;
+let journalSearchSequence = 0;
+let bookingSearchTimer = 0;
+let bookingSearchQuery = "";
+let bookingQuickFilter = "all";
+let bookingRenderLimit = adminBookingInitialRenderLimit;
+const bookingSearchDocumentCache = new Map();
+let bookingRenderSequence = 0;
+let bookingRenderTimer = 0;
+let bookingPrecomputeTimer = 0;
+let bookingPrecomputeUsesIdle = false;
+let lastBookingMatchesKey = "";
+let lastBookingMatches = [];
+let lastSortedBookingsKey = "";
+let lastSortedBookings = [];
+let bookingFallbackRefreshTimer = 0;
+let bookingRealtimeConnection = null;
+let bookingRefreshInFlight = false;
+let lastBookingsSignature = "";
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLowPowerDevice =
   prefersReducedMotion ||
@@ -74,18 +105,24 @@ function formatDateForLegacyBackend(value) {
 const apiContract = window.LuxApiContract || {
   buildAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
-    arrivalDate: formatDateForBackend(arrivalDate),
-    departureDate: formatDateForBackend(departureDate),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    adults: Number(adultCount),
     adultCount: Number(adultCount),
+    children: Number(childCount),
     childCount: Number(childCount),
   }),
   buildBookingPayload: ({ roomId, guestFullName, guestEmail, arrivalDate, departureDate, adultCount, childCount }) => ({
     roomId: Number(roomId),
     guestFullName: String(guestFullName || "").trim(),
     guestEmail: String(guestEmail || "").trim(),
-    arrivalDate: formatDateForBackend(arrivalDate),
-    departureDate: formatDateForBackend(departureDate),
+    arrivalDate: formatDateForLegacyBackend(arrivalDate),
+    departureDate: formatDateForLegacyBackend(departureDate),
+    adult: Number(adultCount),
+    adults: Number(adultCount),
     adultCount: Number(adultCount),
+    children: Number(childCount),
     childCount: Number(childCount),
   }),
   buildLegacyAvailabilityPayload: ({ roomId, arrivalDate, departureDate, adultCount, childCount }) => ({
@@ -153,10 +190,15 @@ const translations = {
     "booking.children": "Children",
     "booking.search": "Search rooms",
     "booking.bookSelected": "Book stay",
+    "booking.confirmCreate": "Create this booking?",
     "booking.chooseRoom": "Choose room",
     "booking.arrivalDate": "Arrival date",
     "booking.departureDate": "Departure date",
     "booking.selectDate": "Select date",
+    "booking.pricePreviewLabel": "Price",
+    "booking.pricePreviewDateHint": "Select dates",
+    "booking.pricePreviewNight": "{{count}} night",
+    "booking.pricePreviewNight_plural": "{{count}} nights",
     "booking.checking": "Checking...",
     "booking.booking": "Booking...",
     "booking.availableFallback": "Room is available.",
@@ -201,6 +243,13 @@ const translations = {
     "journal.defaultTitle": "Lux Hotel Journal",
     "journal.defaultTag": "Journal",
     "journal.defaultCopy": "Stories from the island.",
+    "journal.searchLabel": "Search stories",
+    "journal.searchPlaceholder": "Try style, island, comfort",
+    "journal.clearSearch": "Clear",
+    "journal.loadingSearch": "Searching stories...",
+    "journal.searchResults": "Found {{count}} matching stories.",
+    "journal.noSearchResults": "No stories match that search.",
+    "journal.searchFailed": "Could not search stories.",
     "account.eyebrow": "Guest account",
     "account.title": "Manage your Lux Hotel stay.",
     "account.summarySignedOut": "Sign in to keep your booking profile ready before arrival.",
@@ -231,11 +280,27 @@ const translations = {
     "account.loggedOut": "Logged out.",
     "account.myBookingsLabel": "Bookings",
     "account.myBookings": "My bookings",
+    "account.userBookings": "User's bookings",
     "account.refreshBookings": "Refresh",
+    "account.bookingSearchLabel": "Search user bookings",
+    "account.bookingSearchPlaceholder": "Guest, email, room, status, payment, ID",
+    "account.clearBookingSearch": "Clear",
+    "account.bookingFiltersAria": "Booking filters",
+    "account.filterAllBookings": "All",
+    "account.filterNeedsPayment": "Needs payment",
+    "account.filterPaidBookings": "Paid",
+    "account.filterCancelledBookings": "Cancelled",
+    "account.bookingSearchCount": "{{shown}} of {{total}} bookings",
+    "account.bookingVisibleCount": "Showing {{visible}} of {{shown}} matches.",
+    "account.bookingFilterProgress": "Scanning {{processed}} of {{total}} bookings. {{matched}} matches so far.",
+    "account.loadMoreBookings": "Show more",
+    "account.filteringBookings": "Filtering bookings...",
+    "account.noBookingMatches": "No bookings match this search.",
     "account.loadingBookings": "Loading bookings...",
     "account.noBookings": "No bookings yet.",
     "account.bookingLoadFailed": "Could not load your bookings.",
     "account.cancelBooking": "Cancel booking",
+    "account.confirmCancel": "Cancel this booking?",
     "account.canceling": "Canceling...",
     "account.cancelled": "Booking cancelled.",
     "account.cancelBookingConfirm": "Are you sure you want to cancel booking?",
@@ -243,6 +308,7 @@ const translations = {
     "account.cancelBookingNo": "NO",
     "account.bookingCancelFailed": "Could not cancel this booking.",
     "account.completePayment": "Complete payment",
+    "account.confirmPayment": "Complete payment for this booking?",
     "account.completingPayment": "Completing...",
     "account.paymentCompleted": "Payment completed.",
     "account.paymentFailed": "Could not complete this payment.",
@@ -252,6 +318,8 @@ const translations = {
     "account.paymentStatus": "Payment: {{status}}",
     "account.paymentPending": "Pending",
     "account.paymentCompletedStatus": "Completed",
+    "account.bookingGuestLabel": "Guest",
+    "account.bookingUserId": "User ID: {{id}}",
     "account.bookingDates": "{{arrival}} to {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Total: {{total}}",
@@ -320,10 +388,15 @@ const translations = {
     "booking.children": "Trẻ em",
     "booking.search": "Tìm phòng",
     "booking.bookSelected": "Đặt phòng",
+    "booking.confirmCreate": "Tạo booking này?",
     "booking.chooseRoom": "Chọn phòng",
     "booking.arrivalDate": "Ngày đến",
     "booking.departureDate": "Ngày đi",
     "booking.selectDate": "Chọn ngày",
+    "booking.pricePreviewLabel": "Giá",
+    "booking.pricePreviewDateHint": "Chọn ngày",
+    "booking.pricePreviewNight": "{{count}} đêm",
+    "booking.pricePreviewNight_plural": "{{count}} đêm",
     "booking.checking": "Đang kiểm tra...",
     "booking.booking": "Đang đặt...",
     "booking.availableFallback": "Phòng còn trống.",
@@ -368,6 +441,13 @@ const translations = {
     "journal.defaultTitle": "Nhật ký Lux Hotel",
     "journal.defaultTag": "Nhật ký",
     "journal.defaultCopy": "Câu chuyện từ hòn đảo.",
+    "journal.searchLabel": "Tìm câu chuyện",
+    "journal.searchPlaceholder": "Thử phong cách, hòn đảo, thoải mái",
+    "journal.clearSearch": "Xóa",
+    "journal.loadingSearch": "Đang tìm câu chuyện...",
+    "journal.searchResults": "Tìm thấy {{count}} câu chuyện phù hợp.",
+    "journal.noSearchResults": "Không có câu chuyện phù hợp.",
+    "journal.searchFailed": "Không tìm được câu chuyện.",
     "account.eyebrow": "Tài khoản khách",
     "account.title": "Quản lý kỳ nghỉ Lux Hotel.",
     "account.summarySignedOut": "Đăng nhập để chuẩn bị hồ sơ đặt phòng trước ngày đến.",
@@ -398,15 +478,32 @@ const translations = {
     "account.loggedOut": "Đã đăng xuất.",
     "account.myBookingsLabel": "Booking",
     "account.myBookings": "Booking của tôi",
+    "account.userBookings": "Booking của user",
     "account.refreshBookings": "Tải lại",
+    "account.bookingSearchLabel": "Tìm booking của user",
+    "account.bookingSearchPlaceholder": "Khách, email, phòng, trạng thái, thanh toán, mã ID",
+    "account.clearBookingSearch": "Xóa",
+    "account.bookingFiltersAria": "Bộ lọc booking",
+    "account.filterAllBookings": "Tất cả",
+    "account.filterNeedsPayment": "Chưa thanh toán",
+    "account.filterPaidBookings": "Đã thanh toán",
+    "account.filterCancelledBookings": "Đã hủy",
+    "account.bookingSearchCount": "{{shown}} / {{total}} booking",
+    "account.bookingVisibleCount": "Đang hiện {{visible}} / {{shown}} kết quả.",
+    "account.bookingFilterProgress": "Đã quét {{processed}} / {{total}} booking. Tạm thấy {{matched}} kết quả.",
+    "account.loadMoreBookings": "Hiện thêm",
+    "account.filteringBookings": "Đang lọc booking...",
+    "account.noBookingMatches": "Không có booking phù hợp.",
     "account.loadingBookings": "Đang tải booking...",
     "account.noBookings": "Chưa có booking nào.",
     "account.bookingLoadFailed": "Không tải được booking của bạn.",
     "account.cancelBooking": "Hủy booking",
+    "account.confirmCancel": "Bạn chắc chắn muốn hủy booking này?",
     "account.canceling": "Đang hủy...",
     "account.cancelled": "Đã hủy booking.",
     "account.bookingCancelFailed": "Không hủy được booking này.",
     "account.completePayment": "Hoàn tất thanh toán",
+    "account.confirmPayment": "Xác nhận hoàn tất thanh toán booking này?",
     "account.completingPayment": "Đang xử lý...",
     "account.paymentCompleted": "Đã hoàn tất thanh toán.",
     "account.paymentFailed": "Không hoàn tất được thanh toán này.",
@@ -416,6 +513,8 @@ const translations = {
     "account.paymentStatus": "Thanh toán: {{status}}",
     "account.paymentPending": "Chờ thanh toán",
     "account.paymentCompletedStatus": "Đã thanh toán",
+    "account.bookingGuestLabel": "Khách",
+    "account.bookingUserId": "Mã user: {{id}}",
     "account.bookingDates": "{{arrival}} đến {{departure}}",
     "account.bookingGuests": "{{guests}}",
     "account.bookingTotal": "Tổng: {{total}}",
@@ -524,6 +623,99 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("đ", "d")
+    .replaceAll("Đ", "d")
+    .toLowerCase();
+}
+
+function searchKeywords(query, minimumLength = 2) {
+  const normalized = normalizeSearchText(query).trim();
+  if (!normalized) return [];
+
+  return [...new Set(normalized.split(/[,\s]+/).filter((keyword) => keyword.length >= minimumLength))];
+}
+
+function createAhoCorasickMatcher(patterns) {
+  const cleanedPatterns = [...new Set(
+    patterns
+      .map((pattern) => String(pattern || "").trim())
+      .filter(Boolean)
+  )];
+  const nodes = [{ next: new Map(), go: new Map(), failure: 0, exit: -1, outputs: [] }];
+  const alphabet = new Set();
+
+  cleanedPatterns.forEach((pattern) => {
+    let state = 0;
+    for (const character of pattern) {
+      alphabet.add(character);
+      if (!nodes[state].next.has(character)) {
+        nodes[state].next.set(character, nodes.length);
+        nodes.push({ next: new Map(), go: new Map(), failure: 0, exit: -1, outputs: [] });
+      }
+      state = nodes[state].next.get(character);
+    }
+    nodes[state].outputs.push(pattern);
+  });
+
+  const alphabetList = [...alphabet];
+  alphabetList.forEach((character) => {
+    nodes[0].go.set(character, nodes[0].next.get(character) ?? 0);
+  });
+
+  const queue = [...nodes[0].next.values()];
+  while (queue.length) {
+    const state = queue.shift();
+    const failure = nodes[state].failure;
+    nodes[state].exit = nodes[failure].outputs.length ? failure : nodes[failure].exit;
+
+    for (const character of alphabetList) {
+      if (nodes[state].next.has(character)) {
+        const target = nodes[state].next.get(character);
+        nodes[state].go.set(character, target);
+        nodes[target].failure = nodes[failure].go.get(character) ?? 0;
+        queue.push(target);
+      } else {
+        nodes[state].go.set(character, nodes[failure].go.get(character) ?? 0);
+      }
+    }
+  }
+
+  const go = (state, character) => nodes[state].go.get(character) ?? 0;
+
+  const findOccurrences = (text) => {
+    if (nodes.length === 1 || !text) return [];
+
+    const occurrences = [];
+    let state = 0;
+    [...String(text)].forEach((character, index) => {
+      state = go(state, character);
+
+      for (const pattern of nodes[state].outputs) {
+        occurrences.push({ pattern, startIndex: index - pattern.length + 1, endIndex: index });
+      }
+
+      for (let exit = nodes[state].exit; exit !== -1; exit = nodes[exit].exit) {
+        for (const pattern of nodes[exit].outputs) {
+          occurrences.push({ pattern, startIndex: index - pattern.length + 1, endIndex: index });
+        }
+      }
+    });
+    return occurrences;
+  };
+  const find = (text) => findOccurrences(text).map((match) => match.pattern);
+
+  return {
+    hasPatterns: cleanedPatterns.length > 0,
+    find,
+    findOccurrences,
+    containsAny: (text) => find(text).length > 0,
+  };
 }
 
 function localImagePath(path, fallback = "./Images/Room - Standard.jpg") {
@@ -660,6 +852,7 @@ function saveAuth(auth) {
 }
 
 function clearStoredAuth() {
+  stopBookingAutoRefresh();
   localStorage.removeItem(authStorageKey);
 }
 
@@ -1079,6 +1272,7 @@ const fallbackJournal = [
 ];
 
 let journal = [...fallbackJournal];
+let allJournalPosts = [...fallbackJournal];
 
 function journalKey(post) {
   return String(post?.slug || post?.title || "").trim().toLowerCase();
@@ -1159,6 +1353,7 @@ function renderRoomOptions() {
   if (!rooms.length) {
     selectedRoomId = 0;
     select.innerHTML = `<option value="">${escapeHtml(t("rooms.empty"))}</option>`;
+    updateBookingPricePreview();
     return;
   }
 
@@ -1175,6 +1370,7 @@ function renderRoomOptions() {
       `;
     })
     .join("");
+  updateBookingPricePreview();
 }
 
 function renderRooms() {
@@ -1190,7 +1386,7 @@ function renderRooms() {
         <article class="room-card">
           <button class="room-card-button" type="button" data-room-index="${index}" aria-label="${escapeHtml(t("rooms.viewDetailsAria", { room: title }))}">
             <div class="room-media">
-              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
+              <img src="${escapeHtml(room.image)}" alt="${escapeHtml(title)}" decoding="async" />
             </div>
             <div class="content">
               <p class="price">${escapeHtml(roomPrice(room))}</p>
@@ -1285,10 +1481,25 @@ function isPaymentCompleted(value) {
 
 function normalizeBooking(booking = {}) {
   const payment = booking.payment || booking.Payment || {};
+  const user = booking.user || booking.User || booking.guest || booking.Guest || {};
   return {
     id: String(booking.id || booking.Id || ""),
     roomId: Number(booking.roomId ?? booking.RoomId ?? 0),
     roomTitle: firstValue(booking.roomTitle, booking.RoomTitle, booking.roomName, booking.RoomName),
+    userId: String(firstValue(booking.userId, booking.UserId, user.id, user.Id) || ""),
+    guestFullName: firstValue(
+      booking.guestFullName,
+      booking.GuestFullName,
+      booking.fullName,
+      booking.FullName,
+      user.fullName,
+      user.FullName,
+      user.name,
+      user.Name,
+      user.userName,
+      user.UserName
+    ),
+    guestEmail: firstValue(booking.guestEmail, booking.GuestEmail, booking.email, booking.Email, user.email, user.Email),
     arrivalDate: toDateInputLike(booking.arrivalDate || booking.ArrivalDate || ""),
     departureDate: toDateInputLike(booking.departureDate || booking.DepartureDate || ""),
     adult: Number(booking.adultCount ?? booking.AdultCount ?? booking.adult ?? booking.Adult ?? booking.adults ?? booking.Adults ?? 1),
@@ -1308,13 +1519,368 @@ function canCancelBooking(booking) {
   return booking.status === "Confirmed";
 }
 
-function canCompletePayment(booking) {
+function canCompletePayment(booking, auth = getStoredAuth()) {
   return (
-    userHasRole(getStoredAuth(), "Admin") &&
+    paymentApiAvailable &&
+    userHasRole(auth, "Admin") &&
     Boolean(booking.id) &&
     ["Confirmed", "Pending"].includes(booking.status) &&
     !isPaymentCompleted(booking.paymentStatus)
   );
+}
+
+function renderAdminBookingGuest(booking, auth) {
+  if (!userHasRole(auth, "Admin")) return "";
+
+  const guestName = firstValue(booking.guestFullName, booking.guestEmail, booking.userId);
+  if (!guestName) return "";
+
+  const guestEmailMarkup = booking.guestEmail && booking.guestEmail !== guestName
+    ? `<small>${escapeHtml(booking.guestEmail)}</small>`
+    : "";
+  const userIdMarkup = booking.userId && booking.userId !== booking.guestEmail
+    ? `<small>${escapeHtml(t("account.bookingUserId", { id: booking.userId }))}</small>`
+    : "";
+
+  return `
+    <div class="booking-guest-info">
+      <span>${escapeHtml(t("account.bookingGuestLabel"))}</span>
+      <strong>${escapeHtml(guestName)}</strong>
+      ${guestEmailMarkup}
+      ${userIdMarkup}
+    </div>
+  `;
+}
+
+function bookingRoomName(booking) {
+  const room = findRoomById(booking.roomId);
+  return booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
+}
+
+function bookingSearchDocument(booking, auth = getStoredAuth()) {
+  const cacheKey = `${currentLanguage}|${paymentApiAvailable ? "payment" : "no-payment"}|${booking.id}`;
+  if (bookingSearchDocumentCache.has(cacheKey)) return bookingSearchDocumentCache.get(cacheKey);
+
+  const room = findRoomById(booking.roomId);
+  const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+  const paymentKeywords = [
+    paymentStatus,
+    booking.paymentStatus,
+    isPaymentCompleted(booking.paymentStatus) ? "paid completed da thanh toan" : "pending unpaid chua thanh toan",
+    canCompletePayment(booking, auth) ? `${t("account.completePayment")} needs payment complete payment` : "",
+  ];
+
+  const documentText = normalizeSearchText([
+    booking.id,
+    booking.userId,
+    booking.guestFullName,
+    booking.guestEmail,
+    bookingRoomName(booking),
+    room?.title,
+    room?.titleVi,
+    booking.status,
+    formatBookingDate(booking.arrivalDate),
+    formatBookingDate(booking.departureDate),
+    booking.arrivalDate,
+    booking.departureDate,
+    formatGuests(booking.adult, booking.children),
+    formatMoney(booking.totalPrice),
+    ...paymentKeywords,
+  ].filter(Boolean).join(" "));
+  bookingSearchDocumentCache.set(cacheKey, documentText);
+  return documentText;
+}
+
+function bookingMatchesQuickFilter(booking, auth = getStoredAuth()) {
+  if (bookingQuickFilter === "needs-payment") return canCompletePayment(booking, auth);
+  if (bookingQuickFilter === "paid") return isPaymentCompleted(booking.paymentStatus);
+  if (bookingQuickFilter === "cancelled") return booking.status === "Cancelled";
+  return true;
+}
+
+function filterBookingsForAccount(bookings, auth) {
+  if (!userHasRole(auth, "Admin")) return [...bookings];
+
+  const quickFilteredBookings = bookings.filter((booking) => bookingMatchesQuickFilter(booking, auth));
+  const keywords = searchKeywords(bookingSearchQuery, 1);
+  if (!keywords.length) return quickFilteredBookings;
+
+  const matcher = createAhoCorasickMatcher(keywords);
+  return quickFilteredBookings.filter((booking) => {
+    const matches = new Set(matcher.find(bookingSearchDocument(booking, auth)));
+    return keywords.every((keyword) => matches.has(keyword));
+  });
+}
+
+function sortBookingsForAccount(bookings, auth) {
+  if (!userHasRole(auth, "Admin")) return [...bookings];
+
+  return [...bookings].sort((left, right) => {
+    const paymentPriority = Number(canCompletePayment(right, auth)) - Number(canCompletePayment(left, auth));
+    if (paymentPriority !== 0) return paymentPriority;
+
+    const statusPriority = Number(right.status === "Confirmed") - Number(left.status === "Confirmed");
+    if (statusPriority !== 0) return statusPriority;
+
+    const rightDate = Date.parse(right.arrivalDate || "") || 0;
+    const leftDate = Date.parse(left.arrivalDate || "") || 0;
+    return rightDate - leftDate;
+  });
+}
+
+function sortedBookingsForAccount(bookings, auth = getStoredAuth()) {
+  const key = [
+    lastBookingsSignature,
+    userHasRole(auth, "Admin") ? "admin" : "user",
+    paymentApiAvailable ? "payment-api" : "no-payment-api",
+  ].join("|");
+
+  if (lastSortedBookingsKey === key) return lastSortedBookings;
+
+  lastSortedBookingsKey = key;
+  lastSortedBookings = sortBookingsForAccount(bookings, auth);
+  return lastSortedBookings;
+}
+
+function renderBookingItem(booking, auth = getStoredAuth()) {
+  const roomName = bookingRoomName(booking);
+  const status = booking.status || "Pending";
+  const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
+  const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+  const paymentStatusMarkup = paymentStatus
+    ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
+    : "";
+  const guestInfoMarkup = renderAdminBookingGuest(booking, auth);
+  const paymentActionMarkup = canCompletePayment(booking, auth)
+    ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
+    : "";
+
+  return `
+    <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
+      <div class="booking-item-header">
+        <div>
+          <p class="booking-item-kicker">${escapeHtml(t("account.bookingDates", {
+            arrival: formatBookingDate(booking.arrivalDate),
+            departure: formatBookingDate(booking.departureDate),
+          }))}</p>
+          <h3>${escapeHtml(roomName)}</h3>
+        </div>
+        <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
+      </div>
+      ${guestInfoMarkup}
+      <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
+      <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
+      ${paymentStatusMarkup}
+      <div class="booking-item-actions">
+        ${paymentActionMarkup}
+        <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
+      </div>
+    </article>
+  `;
+}
+
+function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCount = myBookings.length, visibleCount = shownCount) {
+  const tools = $("#bookingAdminTools");
+  if (!tools) return;
+
+  const isAdmin = Boolean(auth?.token) && userHasRole(auth, "Admin");
+  tools.hidden = !isAdmin || !totalCount;
+  if (!isAdmin) return;
+
+  const input = $("#bookingSearchInput");
+  if (input && input.value !== bookingSearchQuery) input.value = bookingSearchQuery;
+
+  const clearButton = $("#bookingSearchClear");
+  if (clearButton) clearButton.hidden = !bookingSearchQuery.trim();
+
+  $$("[data-booking-filter]", tools).forEach((button) => {
+    const isActive = button.dataset.bookingFilter === bookingQuickFilter;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  const count = $("#bookingSearchCount");
+  if (count) {
+    const totalText = t("account.bookingSearchCount", {
+      shown: shownCount,
+      total: totalCount,
+    });
+    const visibleText = shownCount > visibleCount
+      ? ` ${t("account.bookingVisibleCount", { visible: visibleCount, shown: shownCount })}`
+      : "";
+    count.textContent = `${totalText}${visibleText}`;
+  }
+}
+
+function updateBookingFilterProgress(auth, matchedCount, totalCount, processedCount) {
+  const tools = $("#bookingAdminTools");
+  if (!tools) return;
+
+  const isAdmin = Boolean(auth?.token) && userHasRole(auth, "Admin");
+  tools.hidden = !isAdmin || !totalCount;
+  if (!isAdmin) return;
+
+  const count = $("#bookingSearchCount");
+  if (!count) return;
+
+  count.textContent = t("account.bookingFilterProgress", {
+    processed: Math.min(processedCount, totalCount),
+    total: totalCount,
+    matched: matchedCount,
+  });
+}
+
+function updateBookingHistoryTitle(auth = getStoredAuth()) {
+  const title = $("#bookingHistoryTitle");
+  if (!title) return;
+
+  title.textContent = t(userHasRole(auth, "Admin") ? "account.userBookings" : "account.myBookings");
+}
+
+function bookingMatchesKey(auth = getStoredAuth()) {
+  return [
+    lastBookingsSignature,
+    userHasRole(auth, "Admin") ? "admin" : "user",
+    bookingQuickFilter,
+    normalizeSearchText(bookingSearchQuery),
+    currentLanguage,
+    paymentApiAvailable ? "payment-api" : "no-payment-api",
+  ].join("|");
+}
+
+function cancelBookingRenderJob() {
+  bookingRenderSequence += 1;
+  if (bookingRenderTimer) {
+    window.clearTimeout(bookingRenderTimer);
+    bookingRenderTimer = 0;
+  }
+}
+
+function clearBookingSearchCaches() {
+  bookingSearchDocumentCache.clear();
+  lastBookingMatchesKey = "";
+  lastBookingMatches = [];
+  lastSortedBookingsKey = "";
+  lastSortedBookings = [];
+}
+
+function stopBookingSearchPrecompute() {
+  if (bookingPrecomputeTimer) {
+    if (bookingPrecomputeUsesIdle && "cancelIdleCallback" in window) {
+      window.cancelIdleCallback(bookingPrecomputeTimer);
+    } else {
+      window.clearTimeout(bookingPrecomputeTimer);
+    }
+    bookingPrecomputeTimer = 0;
+    bookingPrecomputeUsesIdle = false;
+  }
+}
+
+function scheduleBookingSearchPrecompute(callback) {
+  if ("requestIdleCallback" in window) {
+    bookingPrecomputeUsesIdle = true;
+    bookingPrecomputeTimer = window.requestIdleCallback(callback, {
+      timeout: adminBookingPrecomputeIdleTimeoutMs,
+    });
+    return;
+  }
+
+  bookingPrecomputeUsesIdle = false;
+  bookingPrecomputeTimer = window.setTimeout(callback, 0);
+}
+
+function precomputeBookingSearchDocuments(bookings, auth = getStoredAuth()) {
+  stopBookingSearchPrecompute();
+  if (!userHasRole(auth, "Admin") || bookings.length <= adminBookingAsyncThreshold) return;
+
+  let index = 0;
+  const step = (deadline) => {
+    bookingPrecomputeTimer = 0;
+    bookingPrecomputeUsesIdle = false;
+
+    let processed = 0;
+    while (index < bookings.length && processed < adminBookingFilterBatchSize) {
+      bookingSearchDocument(bookings[index], auth);
+      index += 1;
+      processed += 1;
+
+      if (deadline && !deadline.didTimeout && deadline.timeRemaining() < 6) break;
+    }
+
+    if (index < bookings.length) scheduleBookingSearchPrecompute(step);
+  };
+
+  scheduleBookingSearchPrecompute(step);
+}
+
+function renderBookingMatches(matchedBookings, auth, list) {
+  const isAdmin = userHasRole(auth, "Admin");
+  const renderLimit = isAdmin ? Math.min(bookingRenderLimit, matchedBookings.length) : matchedBookings.length;
+  const visibleBookings = matchedBookings.slice(0, renderLimit);
+  updateBookingAdminTools(auth, matchedBookings.length, myBookings.length, visibleBookings.length);
+
+  if (!matchedBookings.length) {
+    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookingMatches"))}</p>`;
+    return;
+  }
+
+  const loadMoreMarkup = isAdmin && matchedBookings.length > visibleBookings.length
+    ? `<button class="booking-load-more" type="button" data-load-more-bookings>${escapeHtml(t("account.loadMoreBookings"))}</button>`
+    : "";
+
+  list.innerHTML = `${visibleBookings.map((booking) => renderBookingItem(booking, auth)).join("")}${loadMoreMarkup}`;
+}
+
+function renderBookingHistoryAsync(bookings, auth, list) {
+  const key = bookingMatchesKey(auth);
+  if (lastBookingMatchesKey === key) {
+    renderBookingMatches(lastBookingMatches, auth, list);
+    return;
+  }
+
+  cancelBookingRenderJob();
+  const sequence = bookingRenderSequence;
+  const keywords = searchKeywords(bookingSearchQuery, 1);
+  const matcher = keywords.length ? createAhoCorasickMatcher(keywords) : null;
+  const sortedBookings = sortedBookingsForAccount(bookings, auth);
+  const matches = [];
+  let index = 0;
+
+  updateBookingFilterProgress(auth, 0, sortedBookings.length, 0);
+  if (!list.children.length) {
+    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
+  }
+
+  const step = () => {
+    if (sequence !== bookingRenderSequence) return;
+
+    const end = Math.min(index + adminBookingFilterBatchSize, sortedBookings.length);
+    for (; index < end; index += 1) {
+      const booking = sortedBookings[index];
+      if (!bookingMatchesQuickFilter(booking, auth)) continue;
+      if (matcher) {
+        const found = new Set(matcher.find(bookingSearchDocument(booking, auth)));
+        if (!keywords.every((keyword) => found.has(keyword))) continue;
+      }
+      matches.push(booking);
+    }
+
+    updateBookingFilterProgress(auth, matches.length, sortedBookings.length, index);
+
+    if (index < sortedBookings.length) {
+      bookingRenderTimer = window.setTimeout(step, 0);
+      return;
+    }
+
+    bookingRenderTimer = 0;
+    if (sequence !== bookingRenderSequence) return;
+
+    lastBookingMatchesKey = key;
+    lastBookingMatches = matches;
+    renderBookingMatches(lastBookingMatches, auth, list);
+  };
+
+  bookingRenderTimer = window.setTimeout(step, 0);
 }
 
 function renderBookingHistory(message = "") {
@@ -1323,64 +1889,106 @@ function renderBookingHistory(message = "") {
   if (!history || !list) return;
 
   const auth = getStoredAuth();
+  const isAdmin = userHasRole(auth, "Admin");
+  updateBookingHistoryTitle(auth);
   history.hidden = !auth?.token;
+  history.classList.toggle("is-admin", Boolean(auth?.token && isAdmin));
   if (!auth?.token) {
+    cancelBookingRenderJob();
+    updateBookingAdminTools(auth, 0, 0);
     list.innerHTML = "";
     return;
   }
 
   if (message) {
+    cancelBookingRenderJob();
+    updateBookingAdminTools(auth, 0, myBookings.length);
     list.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
     return;
   }
 
   if (!myBookings.length) {
+    cancelBookingRenderJob();
+    updateBookingAdminTools(auth, 0, 0);
     list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookings"))}</p>`;
     return;
   }
 
-  list.innerHTML = myBookings
-    .map((booking) => {
-      const room = findRoomById(booking.roomId);
-      const roomName = booking.roomTitle || (room ? roomTitle(room) : `${t("booking.room")} #${booking.roomId || ""}`.trim());
-      const status = booking.status || "Pending";
-      const cancelDisabled = canCancelBooking(booking) ? "" : "disabled";
-      const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
-      const paymentStatusMarkup = paymentStatus
-        ? `<p>${escapeHtml(t("account.paymentStatus", { status: paymentStatus }))}</p>`
-        : "";
-      const paymentActionMarkup = canCompletePayment(booking)
-        ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
-        : "";
-      return `
-        <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
-          <div class="booking-item-header">
-            <div>
-              <p class="booking-item-kicker">${escapeHtml(t("account.bookingDates", {
-                arrival: formatBookingDate(booking.arrivalDate),
-                departure: formatBookingDate(booking.departureDate),
-              }))}</p>
-              <h3>${escapeHtml(roomName)}</h3>
-            </div>
-            <span class="booking-item-status ${escapeHtml(bookingStatusClass(status))}">${escapeHtml(status)}</span>
-          </div>
-          <p>${escapeHtml(t("account.bookingGuests", { guests: formatGuests(booking.adult, booking.children) }))}</p>
-          <p>${escapeHtml(t("account.bookingTotal", { total: formatMoney(booking.totalPrice) }))}</p>
-          ${paymentStatusMarkup}
-          <div class="booking-item-actions">
-            ${paymentActionMarkup}
-            <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
+  if (isAdmin && myBookings.length > adminBookingAsyncThreshold) {
+    renderBookingHistoryAsync(myBookings, auth, list);
+    return;
+  }
+
+  cancelBookingRenderJob();
+  const matchedBookings = filterBookingsForAccount(sortedBookingsForAccount(myBookings, auth), auth);
+  lastBookingMatchesKey = bookingMatchesKey(auth);
+  lastBookingMatches = matchedBookings;
+  renderBookingMatches(matchedBookings, auth, list);
+}
+
+function bookingListSignature(bookings) {
+  return JSON.stringify(
+    bookings.map((booking) => ({
+      id: booking.id,
+      roomId: booking.roomId,
+      userId: booking.userId,
+      guestFullName: booking.guestFullName,
+      guestEmail: booking.guestEmail,
+      arrivalDate: booking.arrivalDate,
+      departureDate: booking.departureDate,
+      adult: booking.adult,
+      children: booking.children,
+      totalPrice: booking.totalPrice,
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      paidAt: booking.paidAt,
+    }))
+  );
+}
+
+function queueBookingSearchRender(query) {
+  stopBookingSearchPrecompute();
+  bookingSearchQuery = String(query || "");
+  bookingRenderLimit = adminBookingInitialRenderLimit;
+
+  const clearButton = $("#bookingSearchClear");
+  if (clearButton) clearButton.hidden = !bookingSearchQuery.trim();
+
+  if (bookingSearchTimer) {
+    window.clearTimeout(bookingSearchTimer);
+    bookingSearchTimer = 0;
+  }
+
+  if (bookingSearchDebounceMs <= 0) {
+    renderBookingHistory();
+    return;
+  }
+
+  bookingSearchTimer = window.setTimeout(() => {
+    bookingSearchTimer = 0;
+    renderBookingHistory();
+  }, bookingSearchDebounceMs);
+}
+
+function resetBookingSearchState() {
+  bookingSearchQuery = "";
+  bookingQuickFilter = "all";
+  bookingRenderLimit = adminBookingInitialRenderLimit;
+  clearBookingSearchCaches();
+  stopBookingSearchPrecompute();
+  if (bookingSearchTimer) {
+    window.clearTimeout(bookingSearchTimer);
+    bookingSearchTimer = 0;
+  }
 }
 
 async function fetchMyBookings({ silent = false } = {}) {
   const auth = getStoredAuth();
   if (!auth?.token) {
     myBookings = [];
+    lastBookingsSignature = "";
+    clearBookingSearchCaches();
+    stopBookingSearchPrecompute();
     renderBookingHistory();
     return;
   }
@@ -1410,6 +2018,9 @@ async function fetchMyBookings({ silent = false } = {}) {
       if (response.status === 401) {
         clearStoredAuth();
         myBookings = [];
+        lastBookingsSignature = "";
+        clearBookingSearchCaches();
+        stopBookingSearchPrecompute();
         updateAccountSummary(null);
         renderBookingHistory();
         setAuthStatus("warning", t("booking.signInRequired"));
@@ -1417,18 +2028,33 @@ async function fetchMyBookings({ silent = false } = {}) {
       }
 
       myBookings = [];
+      lastBookingsSignature = "";
+      clearBookingSearchCaches();
+      stopBookingSearchPrecompute();
       renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
       return;
     }
 
-    myBookings = apiContract
+    const nextBookings = apiContract
       .readItems(data)
       .map(normalizeBooking)
       .filter((booking) => booking.id);
-    renderBookingHistory();
+    const nextSignature = bookingListSignature(nextBookings);
+    const hasChanged = nextSignature !== lastBookingsSignature;
+    if (hasChanged) {
+      clearBookingSearchCaches();
+      bookingRenderLimit = adminBookingInitialRenderLimit;
+    }
+    myBookings = nextBookings;
+    lastBookingsSignature = nextSignature;
+    if (hasChanged) precomputeBookingSearchDocuments(myBookings, auth);
+    if (!silent || hasChanged) renderBookingHistory();
   } catch (error) {
     console.error("My bookings API error:", error);
     myBookings = [];
+    lastBookingsSignature = "";
+    clearBookingSearchCaches();
+    stopBookingSearchPrecompute();
     renderBookingHistory(t("account.bookingLoadFailed"));
   }
 }
@@ -1452,10 +2078,91 @@ function openCancelBookingConfirm(bookingId, button) {
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
   modal.querySelector("[data-cancel-booking-confirm-yes]")?.focus();
+function buildBookingHubUrl() {
+  const normalizedApiBase = normalizeApiBase(apiBaseUrl);
+  if (!normalizedApiBase || normalizedApiBase === "/api") return "/hubs/bookings";
+
+  return normalizedApiBase.endsWith("/api")
+    ? `${normalizedApiBase.slice(0, -4)}/hubs/bookings`
+    : `${normalizedApiBase}/hubs/bookings`;
+}
+
+async function refreshBookingsSilently() {
+  if (document.hidden || bookingRefreshInFlight) return;
+
+  bookingRefreshInFlight = true;
+  try {
+    await fetchMyBookings({ silent: true });
+  } finally {
+    bookingRefreshInFlight = false;
+  }
+}
+
+function startBookingFallbackRefresh(auth = getStoredAuth()) {
+  if (!auth?.token) return;
+
+  const interval = userHasRole(auth, "Admin") ? bookingFallbackRefreshMs.admin : bookingFallbackRefreshMs.user;
+  bookingFallbackRefreshTimer = window.setInterval(refreshBookingsSilently, interval);
+}
+
+async function startBookingRealtime(auth = getStoredAuth()) {
+  if (!auth?.token || !window.signalR) return;
+
+  const connection = new window.signalR.HubConnectionBuilder()
+    .withUrl(buildBookingHubUrl(), {
+      accessTokenFactory: () => getStoredAuth()?.token || auth.token || "",
+    })
+    .withAutomaticReconnect()
+    .build();
+
+  bookingRealtimeConnection = connection;
+  connection.on("bookingChanged", refreshBookingsSilently);
+  connection.onreconnected(refreshBookingsSilently);
+  connection.onclose(() => {
+    if (bookingRealtimeConnection === connection) bookingRealtimeConnection = null;
+  });
+
+  try {
+    await connection.start();
+    await refreshBookingsSilently();
+  } catch (error) {
+    console.warn("Booking realtime connection failed; using fallback refresh.", error);
+    if (bookingRealtimeConnection === connection) bookingRealtimeConnection = null;
+  }
+}
+
+function stopBookingAutoRefresh() {
+  if (bookingFallbackRefreshTimer) {
+    window.clearInterval(bookingFallbackRefreshTimer);
+    bookingFallbackRefreshTimer = 0;
+  }
+
+  const connection = bookingRealtimeConnection;
+  bookingRealtimeConnection = null;
+  if (connection) connection.stop().catch(() => {});
+}
+
+function startBookingAutoRefresh(auth = getStoredAuth()) {
+  stopBookingAutoRefresh();
+  if (!auth?.token) return;
+
+  startBookingRealtime(auth);
+  startBookingFallbackRefresh(auth);
+}
+
+function setupBookingAutoRefresh() {
+  document.addEventListener("visibilitychange", () => {
+    const auth = getStoredAuth();
+    if (!auth?.token || document.hidden) return;
+
+    if (!bookingRealtimeConnection) startBookingRealtime(auth);
+    refreshBookingsSilently();
+  });
 }
 
 async function cancelBooking(bookingId, button) {
   if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmCancel"))) return;
 
   button.disabled = true;
   button.textContent = t("account.canceling");
@@ -1499,6 +2206,7 @@ async function cancelBooking(bookingId, button) {
 
 async function completePayment(bookingId, button) {
   if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmPayment"))) return;
 
   button.disabled = true;
   button.textContent = t("account.completingPayment");
@@ -1561,7 +2269,7 @@ function renderReviews() {
       (review) => `
         <article class="review-card">
           <header>
-            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" loading="lazy" decoding="async" fetchpriority="low" />
+            <img src="${escapeHtml(review.image)}" alt="${escapeHtml(review.name)}" decoding="async" />
             <div>
               <h3>${escapeHtml(review.name)}</h3>
               <p>${escapeHtml(t("common.verifiedGuest"))}</p>
@@ -1575,11 +2283,19 @@ function renderReviews() {
 }
 
 function renderJournal() {
-  $("#journalGrid").innerHTML = journal
+  const grid = $("#journalGrid");
+  if (!grid) return;
+
+  if (!journal.length) {
+    grid.innerHTML = `<p class="empty-state">${escapeHtml(t("journal.noSearchResults"))}</p>`;
+    return;
+  }
+
+  grid.innerHTML = journal
     .map(
       (post) => `
         <article class="journal-card">
-          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" loading="eager" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(post.image)}" alt="${escapeHtml(localized(post, "title"))}" decoding="async" />
           <div class="content">
             <p class="tag">${escapeHtml(localized(post, "tag"))}</p>
             <h3>${escapeHtml(localized(post, "title"))}</h3>
@@ -1591,13 +2307,147 @@ function renderJournal() {
     .join("");
 }
 
+function normalizeJournalSearchText(value) {
+  return normalizeSearchText(value);
+}
+
+function journalSearchKeywords(query) {
+  return searchKeywords(query, 2);
+}
+
+function localJournalSearch(query) {
+  const keywords = journalSearchKeywords(query);
+  if (!keywords.length) return [...allJournalPosts];
+  const matcher = createAhoCorasickMatcher(keywords);
+
+  return allJournalPosts.filter((post) => {
+    const searchable = normalizeJournalSearchText([
+      localized(post, "title"),
+      localized(post, "tag"),
+      localized(post, "copy"),
+      post.title,
+      post.tag,
+      post.copy,
+      post.titleVi,
+      post.tagVi,
+      post.copyVi,
+    ].filter(Boolean).join(" "));
+
+    return matcher.containsAny(searchable);
+  });
+}
+
+function setJournalSearchStatus(type, message) {
+  const status = $("#journalSearchStatus");
+  if (!status) return;
+
+  status.className = `form-status ${type ? `is-visible ${type}` : ""}`;
+  status.textContent = message || "";
+}
+
+function renderLocalJournalSearch(query) {
+  const trimmedQuery = String(query || "").trim();
+  if (!trimmedQuery) {
+    journal = [...allJournalPosts];
+    setJournalSearchStatus("", "");
+    renderJournal();
+    window.ScrollTrigger?.refresh();
+    return;
+  }
+
+  journal = localJournalSearch(trimmedQuery);
+  renderJournal();
+  setJournalSearchStatus(
+    journal.length ? "success" : "warning",
+    journal.length ? t("journal.searchResults", { count: journal.length }) : t("journal.noSearchResults")
+  );
+  window.ScrollTrigger?.refresh();
+}
+
+async function searchJournal(query) {
+  const searchId = ++journalSearchSequence;
+  const trimmedQuery = String(query || "").trim();
+  const clearButton = $("#journalSearchClear");
+  if (clearButton) clearButton.hidden = !trimmedQuery;
+
+  if (!trimmedQuery) {
+    journal = [...allJournalPosts];
+    setJournalSearchStatus("", "");
+    renderJournal();
+    window.ScrollTrigger?.refresh();
+    return;
+  }
+
+  setJournalSearchStatus("warning", t("journal.loadingSearch"));
+
+  try {
+    const response = await apiFetch(`/articles/search?q=${encodeURIComponent(trimmedQuery)}`, {
+      returnStatuses: [400, 404, 500],
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      throw new Error(formatApiError(data, t("journal.searchFailed")));
+    }
+
+    if (searchId !== journalSearchSequence) return;
+
+    const apiPosts = apiContract.readItems(data).map(normalizeArticle);
+    journal = apiPosts.length ? apiPosts : localJournalSearch(trimmedQuery);
+    renderJournal();
+    setJournalSearchStatus(
+      journal.length ? "success" : "warning",
+      journal.length ? t("journal.searchResults", { count: journal.length }) : t("journal.noSearchResults")
+    );
+    window.ScrollTrigger?.refresh();
+  } catch (error) {
+    if (searchId !== journalSearchSequence) return;
+
+    console.warn("Using local journal search because the API search is unavailable.", error);
+    journal = localJournalSearch(trimmedQuery);
+    renderJournal();
+    setJournalSearchStatus(
+      journal.length ? "success" : "warning",
+      journal.length ? t("journal.searchResults", { count: journal.length }) : t("journal.searchFailed")
+    );
+    window.ScrollTrigger?.refresh();
+  }
+}
+
+function queueJournalSearch(query) {
+  const trimmedQuery = String(query || "").trim();
+  const clearButton = $("#journalSearchClear");
+  if (clearButton) clearButton.hidden = !trimmedQuery;
+  journalSearchSequence += 1;
+
+  if (journalSearchTimer) {
+    window.clearTimeout(journalSearchTimer);
+    journalSearchTimer = 0;
+  }
+
+  if (journalSearchRenderDelayMs <= 0) {
+    renderLocalJournalSearch(trimmedQuery);
+  } else {
+    window.setTimeout(() => renderLocalJournalSearch(trimmedQuery), journalSearchRenderDelayMs);
+  }
+
+  if (!trimmedQuery) {
+    return;
+  }
+
+  journalSearchTimer = window.setTimeout(() => {
+    journalSearchTimer = 0;
+    searchJournal(trimmedQuery);
+  }, journalApiSearchDebounceMs);
+}
+
 function renderGallery() {
   $("#galleryGrid").innerHTML = gallery
     .map((item, index) => {
       const title = localized(item, "title");
       return `
         <button class="gallery-item" type="button" data-gallery-index="${index}" aria-label="${escapeHtml(t("gallery.openAria", { title }))}">
-          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" loading="lazy" decoding="async" fetchpriority="low" />
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(title)}" decoding="async" />
           <span>
             <small>${escapeHtml(localized(item, "kicker"))}</small>
             <strong>${escapeHtml(title)}</strong>
@@ -1608,57 +2458,18 @@ function renderGallery() {
     .join("");
 }
 
-function setupLazyBackgrounds(root = document) {
+function setupBackgroundImages(root = document) {
   const cards = $$("[data-bg]", root);
   if (!cards.length) return;
 
-  const runWhenIdle = (callback) => {
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(callback, { timeout: 900 });
-      return;
-    }
-
-    window.setTimeout(callback, 80);
-  };
-
-  const loadBackground = (card) => {
+  cards.forEach((card) => {
     const image = card.dataset.bg;
-    if (!image || card.classList.contains("is-bg-loading")) return;
+    if (!image) return;
 
-    card.classList.add("is-bg-loading");
-    const loader = new Image();
-    loader.decoding = "async";
-    loader.onload = () => {
-      runWhenIdle(() => {
-        card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
-        card.classList.add("is-bg-loaded");
-        card.removeAttribute("data-bg");
-      });
-    };
-    loader.onerror = () => {
-      card.classList.remove("is-bg-loading");
-      card.removeAttribute("data-bg");
-    };
-    loader.src = image;
-  };
-
-  if (!("IntersectionObserver" in window)) {
-    cards.forEach(loadBackground);
-    return;
-  }
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        loadBackground(entry.target);
-        observer.unobserve(entry.target);
-      });
-    },
-    { rootMargin: isLowPowerDevice ? "900px 0px" : "640px 0px" }
-  );
-
-  cards.forEach((card) => observer.observe(card));
+    card.style.backgroundImage = `url("${image.replaceAll('"', '\\"')}")`;
+    card.classList.add("is-bg-loaded");
+    card.removeAttribute("data-bg");
+  });
 }
 
 async function fetchRooms() {
@@ -1694,7 +2505,8 @@ async function fetchArticles() {
     const articles = apiContract.readItems(data);
     if (!articles.length) return;
 
-    journal = completeJournalPosts(articles.map(normalizeArticle));
+    allJournalPosts = completeJournalPosts(articles.map(normalizeArticle));
+    journal = [...allJournalPosts];
     renderJournal();
     window.ScrollTrigger?.refresh();
   } catch (error) {
@@ -1755,7 +2567,7 @@ function renderLocalizedContent() {
   renderRoomOptions();
   renderRooms();
   renderAmenities();
-  setupLazyBackgrounds($("#amenitiesGrid"));
+  setupBackgroundImages($("#amenitiesGrid"));
   renderReviews();
   renderJournal();
   renderGallery();
@@ -1900,6 +2712,10 @@ function setAuthStatus(type, message) {
   status.textContent = message || "";
 }
 
+function requestConfirmation(message) {
+  return window.confirm(message);
+}
+
 function updateAccountSummary(auth = getStoredAuth()) {
   const summary = $("#accountSummary");
   const logoutButton = $("#logoutButton");
@@ -1909,6 +2725,8 @@ function updateAccountSummary(auth = getStoredAuth()) {
   const tabs = $(".auth-tabs");
   const panels = $$("[data-auth-panel]");
   if (!summary || !logoutButton) return;
+
+  updateBookingHistoryTitle(auth);
 
   const user = auth?.user;
   if (auth?.token) {
@@ -2062,6 +2880,48 @@ function updateDateDisplays() {
   $$("input[type='date']").forEach(updateDateDisplay);
 }
 
+function stayNightCount(arrival, departure) {
+  if (!arrival || !departure) return 0;
+
+  const arrivalDate = new Date(`${arrival}T00:00:00`);
+  const departureDate = new Date(`${departure}T00:00:00`);
+  if (Number.isNaN(arrivalDate.getTime()) || Number.isNaN(departureDate.getTime())) return 0;
+
+  const nights = Math.round((departureDate - arrivalDate) / 86_400_000);
+  return nights > 0 ? nights : 0;
+}
+
+function roomNightlyPriceValue(room) {
+  const numericPrice = Number(
+    room?.priceValue ?? room?.nightlyPrice ?? room?.NightlyPrice ?? room?.pricePerNight ?? room?.PricePerNight ?? room?.Price
+  );
+  if (Number.isFinite(numericPrice) && numericPrice > 0) return numericPrice;
+
+  const priceText = String(firstValue(room?.price, room?.priceVi, room?.Price, room?.PriceVi) || "");
+  const match = priceText.match(/\d+(?:[,.]\d+)*/);
+  if (!match) return 0;
+
+  const parsed = Number(match[0].replaceAll(",", ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function updateBookingPricePreview() {
+  const value = $("#bookingPriceValue");
+  const hint = $("#bookingPriceHint");
+  if (!value || !hint) return;
+
+  const { arrival, departure, roomId } = readBookingFormValues();
+  const room = findRoomById(roomId) || rooms[0] || allRooms[0];
+  const nightlyPrice = roomNightlyPriceValue(room);
+  const nights = stayNightCount(arrival, departure);
+  const total = nightlyPrice * Math.max(nights, 1);
+
+  value.textContent = total > 0 ? formatMoney(total) : "--";
+  hint.textContent = nights > 0
+    ? t(nights === 1 ? "booking.pricePreviewNight" : "booking.pricePreviewNight_plural", { count: nights })
+    : t("booking.pricePreviewDateHint");
+}
+
 function openNativeDatePicker(input) {
   if (!input) return;
   input.focus({ preventScroll: true });
@@ -2179,6 +3039,7 @@ async function submitAuthForm(form, mode) {
     updateAccountSummary(enrichedAuth);
     await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
+    startBookingAutoRefresh(enrichedAuth);
     form.reset();
     setAuthStatus("success", mode === "login" ? t("account.loggedInAs", { name }) : t("account.createdFor", { name }));
   } catch (error) {
@@ -2190,6 +3051,43 @@ async function submitAuthForm(form, mode) {
   }
 }
 
+function setupBookingSearchControls() {
+  const input = $("#bookingSearchInput");
+  const clearButton = $("#bookingSearchClear");
+  const filterRow = $("#bookingFilterRow");
+
+  input?.addEventListener("input", () => {
+    queueBookingSearchRender(input.value);
+  });
+
+  clearButton?.addEventListener("click", () => {
+    bookingSearchQuery = "";
+    bookingRenderLimit = adminBookingInitialRenderLimit;
+    if (bookingSearchTimer) {
+      window.clearTimeout(bookingSearchTimer);
+      bookingSearchTimer = 0;
+    }
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+    renderBookingHistory();
+  });
+
+  filterRow?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-booking-filter]");
+    if (!button) return;
+
+    if (bookingSearchTimer) {
+      window.clearTimeout(bookingSearchTimer);
+      bookingSearchTimer = 0;
+    }
+    bookingQuickFilter = button.dataset.bookingFilter || "all";
+    bookingRenderLimit = adminBookingInitialRenderLimit;
+    renderBookingHistory();
+  });
+}
+
 function setupAuthForms() {
   if (!$("#loginForm") || !$("#registerForm")) return;
 
@@ -2198,7 +3096,9 @@ function setupAuthForms() {
     updateAccountSummary(auth);
     await detectPaymentApiSupport();
     await fetchMyBookings({ silent: true });
+    startBookingAutoRefresh(auth);
   });
+  setupBookingAutoRefresh();
 
   $$("[data-auth-tab]").forEach((button) => {
     button.addEventListener("click", () => switchAuthPanel(button.dataset.authTab));
@@ -2215,8 +3115,11 @@ function setupAuthForms() {
   });
 
   $("#logoutButton").addEventListener("click", () => {
+    stopBookingAutoRefresh();
     clearStoredAuth();
+    resetBookingSearchState();
     myBookings = [];
+    lastBookingsSignature = "";
     switchAuthPanel("login");
     updateAccountSummary(null);
     renderBookingHistory();
@@ -2224,7 +3127,15 @@ function setupAuthForms() {
   });
 
   $("#refreshBookings")?.addEventListener("click", () => fetchMyBookings());
+  setupBookingSearchControls();
   $("#bookingList")?.addEventListener("click", (event) => {
+    const loadMoreButton = event.target.closest("[data-load-more-bookings]");
+    if (loadMoreButton) {
+      bookingRenderLimit += adminBookingRenderStep;
+      renderBookingHistory();
+      return;
+    }
+
     const paymentButton = event.target.closest("[data-complete-payment]");
     if (paymentButton) {
       completePayment(paymentButton.dataset.completePayment, paymentButton);
@@ -2254,6 +3165,32 @@ function setupAuthForms() {
     if (event.key === "Escape" && modal?.classList.contains("is-open")) {
       closeCancelBookingConfirm();
     }
+  });
+}
+
+function setupJournalSearch() {
+  const form = $("#journalSearchForm");
+  const input = $("#journalSearchInput");
+  const clearButton = $("#journalSearchClear");
+  if (!form || !input) return;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (journalSearchTimer) {
+      window.clearTimeout(journalSearchTimer);
+      journalSearchTimer = 0;
+    }
+    searchJournal(input.value);
+  });
+
+  input.addEventListener("input", () => {
+    queueJournalSearch(input.value);
+  });
+
+  clearButton?.addEventListener("click", () => {
+    input.value = "";
+    input.focus();
+    queueJournalSearch("");
   });
 }
 
@@ -2294,6 +3231,8 @@ async function createBookingFromForm() {
     document.querySelector("#guest-account")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
+
+  if (!requestConfirmation(t("booking.confirmCreate"))) return;
 
   button.disabled = true;
   button.textContent = t("booking.booking");
@@ -2363,22 +3302,28 @@ function setupForms() {
   roomSelect.addEventListener("change", () => {
     selectedRoomId = Number(roomSelect.value || rooms[0]?.id || 1);
     setBookingStatus("", "");
+    updateBookingPricePreview();
   });
 
   ["#arrivalDate", "#departureDate"].forEach((selector) => {
     $(selector).addEventListener("change", (event) => {
       updateDateDisplay(event.currentTarget);
       resetRoomResults();
+      updateBookingPricePreview();
     });
   });
   $("#adult").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 1, maxGuestCount);
     resetRoomResults();
+    updateBookingPricePreview();
   });
   $("#children").addEventListener("change", (event) => {
     normalizeGuestCountInput(event.currentTarget, 0, maxGuestCount);
     resetRoomResults();
+    updateBookingPricePreview();
   });
+
+  updateBookingPricePreview();
 
   $("#check-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2638,7 +3583,7 @@ setupPreferences();
 renderRooms();
 renderRoomOptions();
 renderAmenities();
-setupLazyBackgrounds();
+setupBackgroundImages();
 renderReviews();
 renderJournal();
 renderGallery();
@@ -2647,6 +3592,7 @@ setupHeader();
 setupHeroSlider();
 setupExperience();
 setupAuthForms();
+setupJournalSearch();
 setupForms();
 setupBackToTop();
 setupRoomModal();

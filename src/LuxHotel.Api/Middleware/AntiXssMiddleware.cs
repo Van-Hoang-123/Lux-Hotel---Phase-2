@@ -8,9 +8,16 @@ public class AntiXssMiddleware
     public AntiXssMiddleware(RequestDelegate next, IWebHostEnvironment env)
     {
         _next = next;
-        _csp = env.IsDevelopment()
-            ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'"
-            : "default-src 'self'; frame-ancestors 'none'";
+        _csp =
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
+            "font-src 'self' data: https://fonts.gstatic.com; " +
+            "img-src 'self' data: https:; " +
+            "connect-src 'self' ws: wss:; " +
+            "base-uri 'self'; " +
+            "object-src 'none'; " +
+            "frame-ancestors 'none'";
     }
 
     public async Task InvokeAsync(HttpContext context)
