@@ -18,7 +18,7 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260603-aho-journal" />
+    <link rel="stylesheet" href="style.css?v=20260603-booking-progress-count" />
   </head>
   <body>
     <header class="site-header" id="top">
@@ -221,7 +221,6 @@
             <label for="journalSearchInput" data-i18n="journal.searchLabel">Search stories</label>
             <div class="journal-search-row">
               <input type="search" id="journalSearchInput" name="q" data-i18n-placeholder="journal.searchPlaceholder" placeholder="Try style, island, comfort" autocomplete="off" />
-              <button type="submit" data-i18n="journal.searchButton">Search</button>
               <button type="button" id="journalSearchClear" data-i18n="journal.clearSearch" hidden>Clear</button>
             </div>
             <p class="form-status" id="journalSearchStatus" role="status" aria-live="polite"></p>
@@ -289,6 +288,20 @@
                     <strong id="bookingHistoryTitle" data-i18n="account.myBookings">My bookings</strong>
                   </div>
                   <button id="refreshBookings" type="button" data-i18n="account.refreshBookings">Refresh</button>
+                </div>
+                <div class="booking-admin-tools" id="bookingAdminTools" hidden>
+                  <label for="bookingSearchInput" data-i18n="account.bookingSearchLabel">Search user bookings</label>
+                  <div class="booking-search-row">
+                    <input type="search" id="bookingSearchInput" data-i18n-placeholder="account.bookingSearchPlaceholder" placeholder="Guest, email, room, status, payment, ID" autocomplete="off" />
+                    <button type="button" id="bookingSearchClear" data-i18n="account.clearBookingSearch" hidden>Clear</button>
+                  </div>
+                  <div class="booking-filter-row" id="bookingFilterRow" role="group" aria-label="Booking filters" data-i18n-aria="account.bookingFiltersAria">
+                    <button class="is-active" type="button" data-booking-filter="all" aria-pressed="true" data-i18n="account.filterAllBookings">All</button>
+                    <button type="button" data-booking-filter="needs-payment" aria-pressed="false" data-i18n="account.filterNeedsPayment">Needs payment</button>
+                    <button type="button" data-booking-filter="paid" aria-pressed="false" data-i18n="account.filterPaidBookings">Paid</button>
+                    <button type="button" data-booking-filter="cancelled" aria-pressed="false" data-i18n="account.filterCancelledBookings">Cancelled</button>
+                  </div>
+                  <p class="booking-search-count" id="bookingSearchCount" aria-live="polite"></p>
                 </div>
                 <div class="booking-list" id="bookingList"></div>
               </div>
@@ -382,7 +395,7 @@
       src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@9.0.6/dist/browser/signalr.min.js"></script>
-    <script src="api-contract.js?v=20260603-aho-journal"></script>
-    <script src="dom.js?v=20260603-aho-journal"></script>
+    <script src="api-contract.js?v=20260603-booking-progress-count"></script>
+    <script src="dom.js?v=20260603-booking-progress-count"></script>
   </body>
 </html>

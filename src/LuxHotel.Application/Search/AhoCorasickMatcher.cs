@@ -1,8 +1,11 @@
 namespace LuxHotel.Application.Search;
 
+public readonly record struct AhoCorasickMatch(string Pattern, int StartIndex, int EndIndex);
+
 public sealed class AhoCorasickMatcher
 {
     private readonly List<Node> _nodes = [new Node()];
+    private readonly HashSet<char> _alphabet = [];
 
     public AhoCorasickMatcher(IEnumerable<string> patterns)
     {
@@ -11,15 +14,20 @@ public sealed class AhoCorasickMatcher
             Add(pattern);
         }
 
-        BuildFailureLinks();
+        BuildAutomaton();
     }
 
     public bool ContainsAny(string text)
     {
-        return Find(text).Any();
+        return FindOccurrences(text).Any();
     }
 
     public IEnumerable<string> Find(string text)
+    {
+        return FindOccurrences(text).Select(match => match.Pattern);
+    }
+
+    public IEnumerable<AhoCorasickMatch> FindOccurrences(string text)
     {
         if (_nodes.Count == 1 || string.IsNullOrEmpty(text))
         {
@@ -27,21 +35,21 @@ public sealed class AhoCorasickMatcher
         }
 
         var state = 0;
-        foreach (var character in text)
+        for (var index = 0; index < text.Length; index++)
         {
-            while (state != 0 && !_nodes[state].Next.ContainsKey(character))
-            {
-                state = _nodes[state].Failure;
-            }
-
-            if (_nodes[state].Next.TryGetValue(character, out var nextState))
-            {
-                state = nextState;
-            }
+            state = Go(state, text[index]);
 
             foreach (var pattern in _nodes[state].Outputs)
             {
-                yield return pattern;
+                yield return new AhoCorasickMatch(pattern, index - pattern.Length + 1, index);
+            }
+
+            for (var exit = _nodes[state].Exit; exit != -1; exit = _nodes[exit].Exit)
+            {
+                foreach (var pattern in _nodes[exit].Outputs)
+                {
+                    yield return new AhoCorasickMatch(pattern, index - pattern.Length + 1, index);
+                }
             }
         }
     }
@@ -51,6 +59,7 @@ public sealed class AhoCorasickMatcher
         var state = 0;
         foreach (var character in pattern)
         {
+            _alphabet.Add(character);
             if (!_nodes[state].Next.TryGetValue(character, out var nextState))
             {
                 nextState = _nodes.Count;
@@ -64,42 +73,52 @@ public sealed class AhoCorasickMatcher
         _nodes[state].Outputs.Add(pattern);
     }
 
-    private void BuildFailureLinks()
+    private void BuildAutomaton()
     {
+        foreach (var character in _alphabet)
+        {
+            _nodes[0].Go[character] = _nodes[0].Next.TryGetValue(character, out var nextState) ? nextState : 0;
+        }
+
         var queue = new Queue<int>();
         foreach (var child in _nodes[0].Next.Values)
         {
+            _nodes[child].Failure = 0;
             queue.Enqueue(child);
         }
 
         while (queue.Count > 0)
         {
             var state = queue.Dequeue();
-            foreach (var transition in _nodes[state].Next)
+            var failure = _nodes[state].Failure;
+            _nodes[state].Exit = _nodes[failure].Outputs.Count > 0 ? failure : _nodes[failure].Exit;
+
+            foreach (var character in _alphabet)
             {
-                var character = transition.Key;
-                var target = transition.Value;
-                queue.Enqueue(target);
-
-                var failure = _nodes[state].Failure;
-                while (failure != 0 && !_nodes[failure].Next.ContainsKey(character))
+                if (_nodes[state].Next.TryGetValue(character, out var target))
                 {
-                    failure = _nodes[failure].Failure;
+                    _nodes[state].Go[character] = target;
+                    _nodes[target].Failure = Go(failure, character);
+                    queue.Enqueue(target);
+                    continue;
                 }
 
-                if (_nodes[failure].Next.TryGetValue(character, out var fallback))
-                {
-                    _nodes[target].Failure = fallback;
-                    _nodes[target].Outputs.AddRange(_nodes[fallback].Outputs);
-                }
+                _nodes[state].Go[character] = Go(failure, character);
             }
         }
+    }
+
+    private int Go(int state, char character)
+    {
+        return _nodes[state].Go.TryGetValue(character, out var nextState) ? nextState : 0;
     }
 
     private sealed class Node
     {
         public Dictionary<char, int> Next { get; } = [];
+        public Dictionary<char, int> Go { get; } = [];
         public int Failure { get; set; }
+        public int Exit { get; set; } = -1;
         public List<string> Outputs { get; } = [];
     }
 }
