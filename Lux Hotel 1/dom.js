@@ -31,6 +31,7 @@ let apiBaseUrl = apiCandidates[0] || "/api";
 const authStorageKey = "luxHotelAuth";
 const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
+const frontendAssetVersion = "20260604-booking-relevance-sort";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
 const journalSearchRenderDelayMs = 0;
@@ -39,8 +40,6 @@ const bookingSearchDebounceMs = 0;
 const adminBookingInitialRenderLimit = 120;
 const adminBookingRenderStep = 120;
 const adminBookingAsyncThreshold = 800;
-const adminBookingFilterBatchSize = 96;
-const adminBookingPrecomputeIdleTimeoutMs = 1200;
 const bookingFallbackRefreshMs = {
   admin: 30000,
   user: 45000,
@@ -66,12 +65,15 @@ let bookingRenderLimit = adminBookingInitialRenderLimit;
 const bookingSearchDocumentCache = new Map();
 let bookingRenderSequence = 0;
 let bookingRenderTimer = 0;
-let bookingPrecomputeTimer = 0;
-let bookingPrecomputeUsesIdle = false;
 let lastBookingMatchesKey = "";
 let lastBookingMatches = [];
 let lastSortedBookingsKey = "";
 let lastSortedBookings = [];
+let bookingById = new Map();
+let bookingSearchWorker = null;
+let bookingSearchWorkerDatasetKey = "";
+let bookingSearchWorkerFailed = false;
+let pendingBookingWorkerSearch = null;
 let bookingFallbackRefreshTimer = 0;
 let bookingRealtimeConnection = null;
 let bookingRefreshInFlight = false;
@@ -291,7 +293,6 @@ const translations = {
     "account.filterCancelledBookings": "Cancelled",
     "account.bookingSearchCount": "{{shown}} of {{total}} bookings",
     "account.bookingVisibleCount": "Showing {{visible}} of {{shown}} matches.",
-    "account.bookingFilterProgress": "Scanning {{processed}} of {{total}} bookings. {{matched}} matches so far.",
     "account.loadMoreBookings": "Show more",
     "account.filteringBookings": "Filtering bookings...",
     "account.noBookingMatches": "No bookings match this search.",
@@ -486,7 +487,6 @@ const translations = {
     "account.filterCancelledBookings": "Đã hủy",
     "account.bookingSearchCount": "{{shown}} / {{total}} booking",
     "account.bookingVisibleCount": "Đang hiện {{visible}} / {{shown}} kết quả.",
-    "account.bookingFilterProgress": "Đã quét {{processed}} / {{total}} booking. Tạm thấy {{matched}} kết quả.",
     "account.loadMoreBookings": "Hiện thêm",
     "account.filteringBookings": "Đang lọc booking...",
     "account.noBookingMatches": "Không có booking phù hợp.",
@@ -1708,24 +1708,6 @@ function updateBookingAdminTools(auth = getStoredAuth(), shownCount = 0, totalCo
   }
 }
 
-function updateBookingFilterProgress(auth, matchedCount, totalCount, processedCount) {
-  const tools = $("#bookingAdminTools");
-  if (!tools) return;
-
-  const isAdmin = Boolean(auth?.token) && userHasRole(auth, "Admin");
-  tools.hidden = !isAdmin || !totalCount;
-  if (!isAdmin) return;
-
-  const count = $("#bookingSearchCount");
-  if (!count) return;
-
-  count.textContent = t("account.bookingFilterProgress", {
-    processed: Math.min(processedCount, totalCount),
-    total: totalCount,
-    matched: matchedCount,
-  });
-}
-
 function updateBookingHistoryTitle(auth = getStoredAuth()) {
   const title = $("#bookingHistoryTitle");
   if (!title) return;
@@ -1758,65 +1740,150 @@ function clearBookingSearchCaches() {
   lastBookingMatches = [];
   lastSortedBookingsKey = "";
   lastSortedBookings = [];
+  bookingById = new Map();
+  bookingSearchWorkerDatasetKey = "";
+  pendingBookingWorkerSearch = null;
 }
 
-function stopBookingSearchPrecompute() {
-  if (bookingPrecomputeTimer) {
-    if (bookingPrecomputeUsesIdle && "cancelIdleCallback" in window) {
-      window.cancelIdleCallback(bookingPrecomputeTimer);
-    } else {
-      window.clearTimeout(bookingPrecomputeTimer);
-    }
-    bookingPrecomputeTimer = 0;
-    bookingPrecomputeUsesIdle = false;
-  }
+function buildBookingSearchWorkerDatasetKey(auth = getStoredAuth()) {
+  return [
+    lastBookingsSignature,
+    userHasRole(auth, "Admin") ? "admin" : "user",
+    currentLanguage,
+    paymentApiAvailable ? "payment-api" : "no-payment-api",
+  ].join("|");
 }
 
-function scheduleBookingSearchPrecompute(callback) {
-  if ("requestIdleCallback" in window) {
-    bookingPrecomputeUsesIdle = true;
-    bookingPrecomputeTimer = window.requestIdleCallback(callback, {
-      timeout: adminBookingPrecomputeIdleTimeoutMs,
-    });
-    return;
-  }
-
-  bookingPrecomputeUsesIdle = false;
-  bookingPrecomputeTimer = window.setTimeout(callback, 0);
-}
-
-function precomputeBookingSearchDocuments(bookings, auth = getStoredAuth()) {
-  stopBookingSearchPrecompute();
-  if (!userHasRole(auth, "Admin") || bookings.length <= adminBookingAsyncThreshold) return;
-
-  let index = 0;
-  const step = (deadline) => {
-    bookingPrecomputeTimer = 0;
-    bookingPrecomputeUsesIdle = false;
-
-    let processed = 0;
-    while (index < bookings.length && processed < adminBookingFilterBatchSize) {
-      bookingSearchDocument(bookings[index], auth);
-      index += 1;
-      processed += 1;
-
-      if (deadline && !deadline.didTimeout && deadline.timeRemaining() < 6) break;
-    }
-
-    if (index < bookings.length) scheduleBookingSearchPrecompute(step);
+function bookingSearchWorkerEntry(booking, auth, sortIndex = 0) {
+  const room = findRoomById(booking.roomId);
+  const roomName = bookingRoomName(booking);
+  const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+  const paymentText = isPaymentCompleted(booking.paymentStatus)
+    ? "paid completed da thanh toan"
+    : "pending unpaid chua thanh toan";
+  const paymentActionText = canCompletePayment(booking, auth)
+    ? "complete payment needs payment hoan tat thanh toan chua thanh toan"
+    : "";
+  return {
+    id: String(booking.id),
+    sortIndex,
+    canCompletePayment: canCompletePayment(booking, auth),
+    isPaid: isPaymentCompleted(booking.paymentStatus),
+    isCancelled: booking.status === "Cancelled",
+    searchFields: {
+      guestName: booking.guestFullName,
+      guestEmail: booking.guestEmail,
+      roomName,
+      status: booking.status,
+      payment: [paymentStatus, booking.paymentStatus, paymentText, paymentActionText].filter(Boolean).join(" "),
+      dates: [
+        formatBookingDate(booking.arrivalDate),
+        formatBookingDate(booking.departureDate),
+        booking.arrivalDate,
+        booking.departureDate,
+      ].filter(Boolean).join(" "),
+      meta: [
+        booking.id,
+        booking.userId,
+        formatGuests(booking.adult, booking.children),
+        formatMoney(booking.totalPrice),
+      ].filter(Boolean).join(" "),
+    },
+    searchParts: [
+      booking.id,
+      booking.userId,
+      booking.guestFullName,
+      booking.guestEmail,
+      roomName,
+      room?.title,
+      room?.titleVi,
+      booking.status,
+      formatBookingDate(booking.arrivalDate),
+      formatBookingDate(booking.departureDate),
+      booking.arrivalDate,
+      booking.departureDate,
+      formatGuests(booking.adult, booking.children),
+      formatMoney(booking.totalPrice),
+      paymentStatus,
+      booking.paymentStatus,
+      paymentText,
+      paymentActionText,
+    ],
   };
+}
 
-  scheduleBookingSearchPrecompute(step);
+function getBookingSearchWorker() {
+  if (bookingSearchWorkerFailed || !("Worker" in window)) return null;
+  if (bookingSearchWorker) return bookingSearchWorker;
+
+  try {
+    bookingSearchWorker = new Worker(`booking-search-worker.js?v=${frontendAssetVersion}`);
+  } catch (error) {
+    console.warn("Booking search worker unavailable:", error);
+    bookingSearchWorkerFailed = true;
+    return null;
+  }
+
+  bookingSearchWorker.addEventListener("message", (event) => {
+    const message = event.data || {};
+    if (message.type !== "result") return;
+    if (!pendingBookingWorkerSearch || message.requestId !== pendingBookingWorkerSearch.requestId) return;
+    if (message.datasetKey !== pendingBookingWorkerSearch.datasetKey) return;
+
+    const matchedBookings = (message.ids || [])
+      .map((id) => bookingById.get(String(id)))
+      .filter(Boolean);
+
+    lastBookingMatchesKey = pendingBookingWorkerSearch.matchesKey;
+    lastBookingMatches = matchedBookings;
+    renderBookingMatches(lastBookingMatches, pendingBookingWorkerSearch.auth, pendingBookingWorkerSearch.list);
+    pendingBookingWorkerSearch = null;
+  });
+
+  bookingSearchWorker.addEventListener("error", (event) => {
+    console.warn("Booking search worker failed:", event.message);
+    bookingSearchWorkerFailed = true;
+    bookingSearchWorker?.terminate();
+    bookingSearchWorker = null;
+    bookingSearchWorkerDatasetKey = "";
+    if (pendingBookingWorkerSearch) {
+      renderBookingHistory();
+      pendingBookingWorkerSearch = null;
+    }
+  });
+
+  return bookingSearchWorker;
+}
+
+function syncBookingSearchWorker(bookings, auth = getStoredAuth()) {
+  const worker = getBookingSearchWorker();
+  if (!worker || !userHasRole(auth, "Admin") || bookings.length <= adminBookingAsyncThreshold) return null;
+
+  const datasetKey = buildBookingSearchWorkerDatasetKey(auth);
+  if (bookingSearchWorkerDatasetKey !== datasetKey) {
+    const sortedBookings = sortedBookingsForAccount(bookings, auth);
+    bookingById = new Map(sortedBookings.map((booking) => [String(booking.id), booking]));
+    worker.postMessage({
+      type: "load",
+      datasetKey,
+      entries: sortedBookings.map((booking, index) => bookingSearchWorkerEntry(booking, auth, index)),
+    });
+    bookingSearchWorkerDatasetKey = datasetKey;
+  }
+
+  return { worker, datasetKey };
 }
 
 function renderBookingMatches(matchedBookings, auth, list) {
   const isAdmin = userHasRole(auth, "Admin");
   const renderLimit = isAdmin ? Math.min(bookingRenderLimit, matchedBookings.length) : matchedBookings.length;
   const visibleBookings = matchedBookings.slice(0, renderLimit);
+  list.setAttribute("aria-busy", "false");
   updateBookingAdminTools(auth, matchedBookings.length, myBookings.length, visibleBookings.length);
 
   if (!matchedBookings.length) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookingMatches"))}</p>`;
+    list.scrollTop = 0;
     return;
   }
 
@@ -1825,6 +1892,7 @@ function renderBookingMatches(matchedBookings, auth, list) {
     : "";
 
   list.innerHTML = `${visibleBookings.map((booking) => renderBookingItem(booking, auth)).join("")}${loadMoreMarkup}`;
+  list.scrollTop = 0;
 }
 
 function renderBookingHistoryAsync(bookings, auth, list) {
@@ -1836,47 +1904,35 @@ function renderBookingHistoryAsync(bookings, auth, list) {
 
   cancelBookingRenderJob();
   const sequence = bookingRenderSequence;
-  const keywords = searchKeywords(bookingSearchQuery, 1);
-  const matcher = keywords.length ? createAhoCorasickMatcher(keywords) : null;
-  const sortedBookings = sortedBookingsForAccount(bookings, auth);
-  const matches = [];
-  let index = 0;
-
-  updateBookingFilterProgress(auth, 0, sortedBookings.length, 0);
-  if (!list.children.length) {
-    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
+  const workerState = syncBookingSearchWorker(bookings, auth);
+  if (!workerState) {
+    const matchedBookings = filterBookingsForAccount(sortedBookingsForAccount(bookings, auth), auth);
+    lastBookingMatchesKey = key;
+    lastBookingMatches = matchedBookings;
+    renderBookingMatches(lastBookingMatches, auth, list);
+    return;
   }
 
-  const step = () => {
-    if (sequence !== bookingRenderSequence) return;
+  const count = $("#bookingSearchCount");
+  if (count) count.textContent = t("account.filteringBookings");
+  list.setAttribute("aria-busy", "true");
+  list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
+  list.scrollTop = 0;
 
-    const end = Math.min(index + adminBookingFilterBatchSize, sortedBookings.length);
-    for (; index < end; index += 1) {
-      const booking = sortedBookings[index];
-      if (!bookingMatchesQuickFilter(booking, auth)) continue;
-      if (matcher) {
-        const found = new Set(matcher.find(bookingSearchDocument(booking, auth)));
-        if (!keywords.every((keyword) => found.has(keyword))) continue;
-      }
-      matches.push(booking);
-    }
-
-    updateBookingFilterProgress(auth, matches.length, sortedBookings.length, index);
-
-    if (index < sortedBookings.length) {
-      bookingRenderTimer = window.setTimeout(step, 0);
-      return;
-    }
-
-    bookingRenderTimer = 0;
-    if (sequence !== bookingRenderSequence) return;
-
-    lastBookingMatchesKey = key;
-    lastBookingMatches = matches;
-    renderBookingMatches(lastBookingMatches, auth, list);
+  pendingBookingWorkerSearch = {
+    requestId: sequence,
+    datasetKey: workerState.datasetKey,
+    matchesKey: key,
+    auth,
+    list,
   };
-
-  bookingRenderTimer = window.setTimeout(step, 0);
+  workerState.worker.postMessage({
+    type: "search",
+    requestId: sequence,
+    datasetKey: workerState.datasetKey,
+    query: bookingSearchQuery,
+    quickFilter: bookingQuickFilter,
+  });
 }
 
 function renderBookingHistory(message = "") {
@@ -1943,7 +1999,6 @@ function bookingListSignature(bookings) {
 }
 
 function queueBookingSearchRender(query) {
-  stopBookingSearchPrecompute();
   bookingSearchQuery = String(query || "");
   bookingRenderLimit = adminBookingInitialRenderLimit;
 
@@ -1971,7 +2026,6 @@ function resetBookingSearchState() {
   bookingQuickFilter = "all";
   bookingRenderLimit = adminBookingInitialRenderLimit;
   clearBookingSearchCaches();
-  stopBookingSearchPrecompute();
   if (bookingSearchTimer) {
     window.clearTimeout(bookingSearchTimer);
     bookingSearchTimer = 0;
@@ -1984,7 +2038,6 @@ async function fetchMyBookings({ silent = false } = {}) {
     myBookings = [];
     lastBookingsSignature = "";
     clearBookingSearchCaches();
-    stopBookingSearchPrecompute();
     renderBookingHistory();
     return;
   }
@@ -2016,7 +2069,6 @@ async function fetchMyBookings({ silent = false } = {}) {
         myBookings = [];
         lastBookingsSignature = "";
         clearBookingSearchCaches();
-        stopBookingSearchPrecompute();
         updateAccountSummary(null);
         renderBookingHistory();
         setAuthStatus("warning", t("booking.signInRequired"));
@@ -2026,7 +2078,6 @@ async function fetchMyBookings({ silent = false } = {}) {
       myBookings = [];
       lastBookingsSignature = "";
       clearBookingSearchCaches();
-      stopBookingSearchPrecompute();
       renderBookingHistory(formatApiError(data, t("account.bookingLoadFailed")));
       return;
     }
@@ -2043,14 +2094,12 @@ async function fetchMyBookings({ silent = false } = {}) {
     }
     myBookings = nextBookings;
     lastBookingsSignature = nextSignature;
-    if (hasChanged) precomputeBookingSearchDocuments(myBookings, auth);
     if (!silent || hasChanged) renderBookingHistory();
   } catch (error) {
     console.error("My bookings API error:", error);
     myBookings = [];
     lastBookingsSignature = "";
     clearBookingSearchCaches();
-    stopBookingSearchPrecompute();
     renderBookingHistory(t("account.bookingLoadFailed"));
   }
 }
