@@ -77,7 +77,7 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /let bookingRenderSequence = 0/);
   assert.match(dom, /let lastSortedBookingsKey = ""/);
   assert.match(dom, /let bookingSearchWorker = null/);
-  assert.match(dom, /const frontendAssetVersion = "20260604-booking-worker-list-update"/);
+  assert.match(dom, /const frontendAssetVersion = "20260604-booking-relevance-sort"/);
   assert.doesNotMatch(dom, /account\.bookingFilterProgress/);
   assert.doesNotMatch(dom, /function updateBookingFilterProgress/);
   assert.doesNotMatch(dom, /function precomputeBookingSearchDocuments/);
@@ -86,7 +86,11 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /const cacheKey = `\$\{currentLanguage\}\|\$\{paymentApiAvailable \? "payment" : "no-payment"\}\|\$\{booking\.id\}`/);
   assert.match(dom, /bookingSearchDocumentCache\.has\(cacheKey\)/);
   assert.match(dom, /function sortedBookingsForAccount\(bookings, auth = getStoredAuth\(\)\)/);
-  assert.match(dom, /function bookingSearchWorkerEntry\(booking, auth\)/);
+  assert.match(dom, /function bookingSearchWorkerEntry\(booking, auth, sortIndex = 0\)/);
+  assert.match(dom, /searchFields: \{/);
+  assert.match(dom, /guestName: booking\.guestFullName/);
+  assert.match(dom, /guestEmail: booking\.guestEmail/);
+  assert.match(dom, /sortIndex/);
   assert.match(dom, /new Worker\(`booking-search-worker\.js\?v=\$\{frontendAssetVersion\}`\)/);
   assert.match(dom, /function syncBookingSearchWorker\(bookings, auth = getStoredAuth\(\)\)/);
   assert.match(dom, /function renderBookingHistoryAsync\(bookings, auth, list\)/);
@@ -97,6 +101,9 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /list\.innerHTML = `<p class="empty-state">\$\{escapeHtml\(t\("account\.filteringBookings"\)\)\}<\/p>`/);
   assert.match(dom, /list\.scrollTop = 0/);
   assert.match(bookingWorker, /function createAhoCorasickMatcher\(patterns\)/);
+  assert.match(bookingWorker, /function scoreEntry\(entry, keywords\)/);
+  assert.match(bookingWorker, /fieldScore\(fields\.guestName/);
+  assert.match(bookingWorker, /matches\.sort\(\(left, right\) => \(right\.score - left\.score\) \|\| \(left\.sortIndex - right\.sortIndex\)\)/);
   assert.match(bookingWorker, /self\.onmessage/);
   assert.match(bookingWorker, /type: "result"/);
   assert.match(bookingWorker, /ids/);

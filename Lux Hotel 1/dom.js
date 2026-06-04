@@ -31,7 +31,7 @@ let apiBaseUrl = apiCandidates[0] || "/api";
 const authStorageKey = "luxHotelAuth";
 const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
-const frontendAssetVersion = "20260604-booking-worker-list-update";
+const frontendAssetVersion = "20260604-booking-relevance-sort";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
 const journalSearchRenderDelayMs = 0;
@@ -1754,20 +1754,47 @@ function buildBookingSearchWorkerDatasetKey(auth = getStoredAuth()) {
   ].join("|");
 }
 
-function bookingSearchWorkerEntry(booking, auth) {
+function bookingSearchWorkerEntry(booking, auth, sortIndex = 0) {
   const room = findRoomById(booking.roomId);
+  const roomName = bookingRoomName(booking);
   const paymentStatus = normalizePaymentStatus(booking.paymentStatus);
+  const paymentText = isPaymentCompleted(booking.paymentStatus)
+    ? "paid completed da thanh toan"
+    : "pending unpaid chua thanh toan";
+  const paymentActionText = canCompletePayment(booking, auth)
+    ? "complete payment needs payment hoan tat thanh toan chua thanh toan"
+    : "";
   return {
     id: String(booking.id),
+    sortIndex,
     canCompletePayment: canCompletePayment(booking, auth),
     isPaid: isPaymentCompleted(booking.paymentStatus),
     isCancelled: booking.status === "Cancelled",
+    searchFields: {
+      guestName: booking.guestFullName,
+      guestEmail: booking.guestEmail,
+      roomName,
+      status: booking.status,
+      payment: [paymentStatus, booking.paymentStatus, paymentText, paymentActionText].filter(Boolean).join(" "),
+      dates: [
+        formatBookingDate(booking.arrivalDate),
+        formatBookingDate(booking.departureDate),
+        booking.arrivalDate,
+        booking.departureDate,
+      ].filter(Boolean).join(" "),
+      meta: [
+        booking.id,
+        booking.userId,
+        formatGuests(booking.adult, booking.children),
+        formatMoney(booking.totalPrice),
+      ].filter(Boolean).join(" "),
+    },
     searchParts: [
       booking.id,
       booking.userId,
       booking.guestFullName,
       booking.guestEmail,
-      bookingRoomName(booking),
+      roomName,
       room?.title,
       room?.titleVi,
       booking.status,
@@ -1779,8 +1806,8 @@ function bookingSearchWorkerEntry(booking, auth) {
       formatMoney(booking.totalPrice),
       paymentStatus,
       booking.paymentStatus,
-      isPaymentCompleted(booking.paymentStatus) ? "paid completed da thanh toan" : "pending unpaid chua thanh toan",
-      canCompletePayment(booking, auth) ? "complete payment needs payment hoan tat thanh toan chua thanh toan" : "",
+      paymentText,
+      paymentActionText,
     ],
   };
 }
@@ -1839,7 +1866,7 @@ function syncBookingSearchWorker(bookings, auth = getStoredAuth()) {
     worker.postMessage({
       type: "load",
       datasetKey,
-      entries: sortedBookings.map((booking) => bookingSearchWorkerEntry(booking, auth)),
+      entries: sortedBookings.map((booking, index) => bookingSearchWorkerEntry(booking, auth, index)),
     });
     bookingSearchWorkerDatasetKey = datasetKey;
   }

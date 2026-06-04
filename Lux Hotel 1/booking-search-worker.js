@@ -96,6 +96,46 @@ function buildSearchText(entry) {
   return entry.searchText;
 }
 
+function normalizeField(value) {
+  return normalizeSearchText(value).trim();
+}
+
+function fieldScore(value, keyword, weights) {
+  const text = normalizeField(value);
+  if (!text || !keyword) return 0;
+
+  if (text === keyword) return weights.exact;
+
+  const tokens = text.split(/[^a-z0-9]+/).filter(Boolean);
+  if (tokens.includes(keyword)) return weights.token;
+  if (tokens.some((token) => token.startsWith(keyword))) return weights.prefix;
+  if (text.startsWith(keyword)) return weights.prefix;
+  if (text.includes(keyword)) return weights.contains;
+
+  return 0;
+}
+
+function scoreEntry(entry, keywords) {
+  if (!keywords.length) return 0;
+
+  const fields = entry.searchFields || {};
+  return keywords.reduce((score, keyword) => {
+    const guestScore = Math.max(
+      fieldScore(fields.guestName, keyword, { exact: 9000, token: 7600, prefix: 7000, contains: 5600 }),
+      fieldScore(fields.guestEmail, keyword, { exact: 7200, token: 6400, prefix: 5800, contains: 4200 })
+    );
+    const bookingScore = Math.max(
+      fieldScore(fields.roomName, keyword, { exact: 2200, token: 1900, prefix: 1700, contains: 1300 }),
+      fieldScore(fields.status, keyword, { exact: 900, token: 780, prefix: 700, contains: 500 }),
+      fieldScore(fields.payment, keyword, { exact: 740, token: 660, prefix: 600, contains: 420 }),
+      fieldScore(fields.dates, keyword, { exact: 520, token: 460, prefix: 420, contains: 300 }),
+      fieldScore(fields.meta, keyword, { exact: 260, token: 220, prefix: 180, contains: 120 })
+    );
+
+    return score + Math.max(guestScore, bookingScore);
+  }, 0);
+}
+
 let entries = [];
 
 self.onmessage = (event) => {
@@ -111,7 +151,7 @@ self.onmessage = (event) => {
 
   const keywords = searchKeywords(message.query, 1);
   const matcher = keywords.length ? createAhoCorasickMatcher(keywords) : null;
-  const ids = [];
+  const matches = [];
 
   for (const entry of entries) {
     if (!matchesQuickFilter(entry, message.quickFilter)) continue;
@@ -121,13 +161,19 @@ self.onmessage = (event) => {
       if (!keywords.every((keyword) => found.has(keyword))) continue;
     }
 
-    ids.push(entry.id);
+    matches.push({
+      id: entry.id,
+      score: scoreEntry(entry, keywords),
+      sortIndex: Number(entry.sortIndex || 0),
+    });
   }
+
+  matches.sort((left, right) => (right.score - left.score) || (left.sortIndex - right.sortIndex));
 
   self.postMessage({
     type: "result",
     requestId: message.requestId,
     datasetKey: message.datasetKey,
-    ids,
+    ids: matches.map((match) => match.id),
   });
 };
