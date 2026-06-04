@@ -77,7 +77,7 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /let bookingRenderSequence = 0/);
   assert.match(dom, /let lastSortedBookingsKey = ""/);
   assert.match(dom, /let bookingSearchWorker = null/);
-  assert.match(dom, /const frontendAssetVersion = "20260604-booking-worker-no-lazy"/);
+  assert.match(dom, /const frontendAssetVersion = "20260604-booking-worker-list-update"/);
   assert.doesNotMatch(dom, /account\.bookingFilterProgress/);
   assert.doesNotMatch(dom, /function updateBookingFilterProgress/);
   assert.doesNotMatch(dom, /function precomputeBookingSearchDocuments/);
@@ -91,6 +91,11 @@ test("admin booking payments can be searched and filtered without scrolling thro
   assert.match(dom, /function syncBookingSearchWorker\(bookings, auth = getStoredAuth\(\)\)/);
   assert.match(dom, /function renderBookingHistoryAsync\(bookings, auth, list\)/);
   assert.match(dom, /workerState\.worker\.postMessage\(\{/);
+  assert.doesNotMatch(dom, /message\.requestId !== bookingRenderSequence/);
+  assert.match(dom, /list\.setAttribute\("aria-busy", "true"\)/);
+  assert.match(dom, /list\.setAttribute\("aria-busy", "false"\)/);
+  assert.match(dom, /list\.innerHTML = `<p class="empty-state">\$\{escapeHtml\(t\("account\.filteringBookings"\)\)\}<\/p>`/);
+  assert.match(dom, /list\.scrollTop = 0/);
   assert.match(bookingWorker, /function createAhoCorasickMatcher\(patterns\)/);
   assert.match(bookingWorker, /self\.onmessage/);
   assert.match(bookingWorker, /type: "result"/);

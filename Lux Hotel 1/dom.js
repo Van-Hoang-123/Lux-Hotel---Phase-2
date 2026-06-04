@@ -31,7 +31,7 @@ let apiBaseUrl = apiCandidates[0] || "/api";
 const authStorageKey = "luxHotelAuth";
 const languageStorageKey = "luxHotelLanguage";
 const themeStorageKey = "luxHotelTheme";
-const frontendAssetVersion = "20260604-booking-worker-no-lazy";
+const frontendAssetVersion = "20260604-booking-worker-list-update";
 const toastTimeoutMs = 4400;
 const maxGuestCount = 20;
 const journalSearchRenderDelayMs = 0;
@@ -1801,7 +1801,6 @@ function getBookingSearchWorker() {
     const message = event.data || {};
     if (message.type !== "result") return;
     if (!pendingBookingWorkerSearch || message.requestId !== pendingBookingWorkerSearch.requestId) return;
-    if (message.requestId !== bookingRenderSequence) return;
     if (message.datasetKey !== pendingBookingWorkerSearch.datasetKey) return;
 
     const matchedBookings = (message.ids || [])
@@ -1852,10 +1851,12 @@ function renderBookingMatches(matchedBookings, auth, list) {
   const isAdmin = userHasRole(auth, "Admin");
   const renderLimit = isAdmin ? Math.min(bookingRenderLimit, matchedBookings.length) : matchedBookings.length;
   const visibleBookings = matchedBookings.slice(0, renderLimit);
+  list.setAttribute("aria-busy", "false");
   updateBookingAdminTools(auth, matchedBookings.length, myBookings.length, visibleBookings.length);
 
   if (!matchedBookings.length) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.noBookingMatches"))}</p>`;
+    list.scrollTop = 0;
     return;
   }
 
@@ -1864,6 +1865,7 @@ function renderBookingMatches(matchedBookings, auth, list) {
     : "";
 
   list.innerHTML = `${visibleBookings.map((booking) => renderBookingItem(booking, auth)).join("")}${loadMoreMarkup}`;
+  list.scrollTop = 0;
 }
 
 function renderBookingHistoryAsync(bookings, auth, list) {
@@ -1886,9 +1888,9 @@ function renderBookingHistoryAsync(bookings, auth, list) {
 
   const count = $("#bookingSearchCount");
   if (count) count.textContent = t("account.filteringBookings");
-  if (!list.children.length) {
-    list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
-  }
+  list.setAttribute("aria-busy", "true");
+  list.innerHTML = `<p class="empty-state">${escapeHtml(t("account.filteringBookings"))}</p>`;
+  list.scrollTop = 0;
 
   pendingBookingWorkerSearch = {
     requestId: sequence,
