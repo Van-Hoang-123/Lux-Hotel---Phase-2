@@ -1539,7 +1539,7 @@ function canCompletePayment(booking, auth = getStoredAuth()) {
 
 function canCheckoutBooking(booking, auth = getStoredAuth()) {
   return (
-    userHasRole(auth, "Admin") &&
+    Boolean(auth?.token) &&
     Boolean(booking.id) &&
     booking.status === "Confirmed" &&
     isPaymentCompleted(booking.paymentStatus)

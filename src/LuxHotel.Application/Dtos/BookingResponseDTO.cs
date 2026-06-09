@@ -17,6 +17,8 @@ namespace LuxHotel.Application.Dtos
         public int Children { get; set; }
         public decimal TotalPrice { get; set; }
         public string BookingStatus { get; set; }
+        public string? PaymentStatus { get; set; }
+        public DateTime? PaidAt { get; set; }
 
     }
 }

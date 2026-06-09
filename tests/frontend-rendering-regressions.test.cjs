@@ -63,11 +63,13 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(css, /\.booking-item-actions \.payment-action/);
 });
 
-test("admin account exposes checkout action from the booking controller", () => {
+test("account exposes checkout action for paid user bookings", () => {
+  const checkoutFunction = dom.match(/function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*?\n}/)?.[0] || "";
   assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)/);
-  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*userHasRole\(auth, "Admin"\)/);
-  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*booking\.status === "Confirmed"/);
-  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*isPaymentCompleted\(booking\.paymentStatus\)/);
+  assert.match(checkoutFunction, /Boolean\(auth\?\.token\)/);
+  assert.doesNotMatch(checkoutFunction, /userHasRole\(auth, "Admin"\)/);
+  assert.match(checkoutFunction, /booking\.status === "Confirmed"/);
+  assert.match(checkoutFunction, /isPaymentCompleted\(booking\.paymentStatus\)/);
   assert.match(dom, /data-checkout-booking/);
   assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/checkout/);
   assert.match(dom, /requestConfirmation\(t\("account\.confirmCheckout"\)\)/);

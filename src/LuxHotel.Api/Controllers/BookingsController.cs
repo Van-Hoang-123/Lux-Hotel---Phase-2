@@ -178,7 +178,9 @@ namespace LuxHotel.Api.Controllers
                     Adult = newBooking.Adult,
                     Children = newBooking.Children,
                     TotalPrice = newBooking.TotalPrice,
-                    BookingStatus = newBooking.BookingStatus
+                    BookingStatus = newBooking.BookingStatus,
+                    PaymentStatus = newPayment.PaymentStatus,
+                    PaidAt = newPayment.PaidAt
                 };
 
                 return Ok(responseDto);
@@ -222,6 +224,8 @@ namespace LuxHotel.Api.Controllers
                     Children = b.Children,
                     TotalPrice = b.TotalPrice,
                     BookingStatus = b.BookingStatus,
+                    PaymentStatus = b.Payment != null ? b.Payment.PaymentStatus : null,
+                    PaidAt = b.Payment != null ? b.Payment.PaidAt : null
                 })
                 .ToListAsync();
 
@@ -348,22 +352,36 @@ namespace LuxHotel.Api.Controllers
             return Ok(new { message = "Booking has been cancelled successfully." });
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "User,Admin")]
         [HttpPatch("/api/bookings/{id}/checkout")]
         public async Task<IActionResult> CheckoutBooking(Guid id)
         {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
+
+            if (!Guid.TryParse(userIdStr, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid User ID in token." });
+            }
+
+            // Tìm đơn phòng
+            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
+            if (booking == null)
+            {
+                return NotFound(new { message = "Booking not found." });
+            }
+
+            // User chỉ được checkout booking của chính họ; Admin được xử lý mọi booking.
+            if (!isAdmin && booking.UserId != userId)
+            {
+                return Forbid();
+            }
+
             // Tìm hóa đơn của booking này
             var payment = await _context.Payments.FirstOrDefaultAsync(p => p.BookingId == id);
             if (payment == null || payment.PaymentStatus != "Completed")
             {
                 return BadRequest(new { message = "Cannot checkout. This booking has not been fully paid yet." });
-            }
-
-
-            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
-            if (booking == null)
-            {
-                return NotFound(new { message = "Booking not found." });
             }
 
             // Nếu đơn đã hủy hoặc đã checkout rồi thì báo lỗi
