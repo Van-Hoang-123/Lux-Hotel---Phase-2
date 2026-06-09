@@ -63,6 +63,19 @@ test("frontend exposes the payment completion action from the booking controller
   assert.match(css, /\.booking-item-actions \.payment-action/);
 });
 
+test("admin account exposes checkout action from the booking controller", () => {
+  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)/);
+  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*userHasRole\(auth, "Admin"\)/);
+  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*booking\.status === "Confirmed"/);
+  assert.match(dom, /function canCheckoutBooking\(booking, auth = getStoredAuth\(\)\)[\s\S]*isPaymentCompleted\(booking\.paymentStatus\)/);
+  assert.match(dom, /data-checkout-booking/);
+  assert.match(dom, /\/bookings\/\$\{encodeURIComponent\(bookingId\)\}\/checkout/);
+  assert.match(dom, /requestConfirmation\(t\("account\.confirmCheckout"\)\)/);
+  assert.match(dom, /account\.checkoutForbidden/);
+  assert.match(dom, /status: "CheckedOut"/);
+  assert.match(css, /\.booking-item-actions \.checkout-action/);
+});
+
 test("admin booking payments can be searched and filtered without scrolling through every booking", () => {
   assert.match(html, /id="bookingAdminTools"[\s\S]*id="bookingSearchInput"[\s\S]*id="bookingFilterRow"/);
   assert.match(html, /data-booking-filter="needs-payment"/);

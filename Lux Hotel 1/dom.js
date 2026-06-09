@@ -315,6 +315,12 @@ const translations = {
     "account.paymentStatus": "Payment: {{status}}",
     "account.paymentPending": "Pending",
     "account.paymentCompletedStatus": "Completed",
+    "account.checkoutBooking": "Check out",
+    "account.confirmCheckout": "Check out this booking?",
+    "account.checkingOut": "Checking out...",
+    "account.checkedOut": "Booking checked out.",
+    "account.checkoutFailed": "Could not check out this booking.",
+    "account.checkoutForbidden": "This account cannot check out bookings on the backend.",
     "account.bookingGuestLabel": "Guest",
     "account.bookingUserId": "User ID: {{id}}",
     "account.bookingDates": "{{arrival}} to {{departure}}",
@@ -509,6 +515,12 @@ const translations = {
     "account.paymentStatus": "Thanh toán: {{status}}",
     "account.paymentPending": "Chờ thanh toán",
     "account.paymentCompletedStatus": "Đã thanh toán",
+    "account.checkoutBooking": "Checkout",
+    "account.confirmCheckout": "Xác nhận checkout booking này?",
+    "account.checkingOut": "Đang checkout...",
+    "account.checkedOut": "Đã checkout booking.",
+    "account.checkoutFailed": "Không checkout được booking này.",
+    "account.checkoutForbidden": "Tài khoản này chưa được backend cho phép checkout booking.",
     "account.bookingGuestLabel": "Khách",
     "account.bookingUserId": "Mã user: {{id}}",
     "account.bookingDates": "{{arrival}} đến {{departure}}",
@@ -1525,6 +1537,15 @@ function canCompletePayment(booking, auth = getStoredAuth()) {
   );
 }
 
+function canCheckoutBooking(booking, auth = getStoredAuth()) {
+  return (
+    userHasRole(auth, "Admin") &&
+    Boolean(booking.id) &&
+    booking.status === "Confirmed" &&
+    isPaymentCompleted(booking.paymentStatus)
+  );
+}
+
 function renderAdminBookingGuest(booking, auth) {
   if (!userHasRole(auth, "Admin")) return "";
 
@@ -1564,6 +1585,7 @@ function bookingSearchDocument(booking, auth = getStoredAuth()) {
     booking.paymentStatus,
     isPaymentCompleted(booking.paymentStatus) ? "paid completed da thanh toan" : "pending unpaid chua thanh toan",
     canCompletePayment(booking, auth) ? `${t("account.completePayment")} needs payment complete payment` : "",
+    canCheckoutBooking(booking, auth) ? `${t("account.checkoutBooking")} checkout checked out release room` : "",
   ];
 
   const documentText = normalizeSearchText([
@@ -1650,6 +1672,9 @@ function renderBookingItem(booking, auth = getStoredAuth()) {
   const paymentActionMarkup = canCompletePayment(booking, auth)
     ? `<button class="payment-action" type="button" data-complete-payment="${escapeHtml(booking.id)}">${escapeHtml(t("account.completePayment"))}</button>`
     : "";
+  const checkoutActionMarkup = canCheckoutBooking(booking, auth)
+    ? `<button class="checkout-action" type="button" data-checkout-booking="${escapeHtml(booking.id)}">${escapeHtml(t("account.checkoutBooking"))}</button>`
+    : "";
 
   return `
     <article class="booking-item" data-booking-id="${escapeHtml(booking.id)}">
@@ -1669,6 +1694,7 @@ function renderBookingItem(booking, auth = getStoredAuth()) {
       ${paymentStatusMarkup}
       <div class="booking-item-actions">
         ${paymentActionMarkup}
+        ${checkoutActionMarkup}
         <button type="button" data-cancel-booking="${escapeHtml(booking.id)}" ${cancelDisabled}>${escapeHtml(t("account.cancelBooking"))}</button>
       </div>
     </article>
@@ -1764,10 +1790,14 @@ function bookingSearchWorkerEntry(booking, auth, sortIndex = 0) {
   const paymentActionText = canCompletePayment(booking, auth)
     ? "complete payment needs payment hoan tat thanh toan chua thanh toan"
     : "";
+  const checkoutActionText = canCheckoutBooking(booking, auth)
+    ? "checkout check out checked out tra phong release room"
+    : "";
   return {
     id: String(booking.id),
     sortIndex,
     canCompletePayment: canCompletePayment(booking, auth),
+    canCheckout: canCheckoutBooking(booking, auth),
     isPaid: isPaymentCompleted(booking.paymentStatus),
     isCancelled: booking.status === "Cancelled",
     searchFields: {
@@ -1775,7 +1805,7 @@ function bookingSearchWorkerEntry(booking, auth, sortIndex = 0) {
       guestEmail: booking.guestEmail,
       roomName,
       status: booking.status,
-      payment: [paymentStatus, booking.paymentStatus, paymentText, paymentActionText].filter(Boolean).join(" "),
+      payment: [paymentStatus, booking.paymentStatus, paymentText, paymentActionText, checkoutActionText].filter(Boolean).join(" "),
       dates: [
         formatBookingDate(booking.arrivalDate),
         formatBookingDate(booking.departureDate),
@@ -1808,6 +1838,7 @@ function bookingSearchWorkerEntry(booking, auth, sortIndex = 0) {
       booking.paymentStatus,
       paymentText,
       paymentActionText,
+      checkoutActionText,
     ],
   };
 }
@@ -2285,6 +2316,51 @@ async function completePayment(bookingId, button) {
     if (button.isConnected) {
       button.disabled = false;
       button.textContent = t("account.completePayment");
+    }
+  }
+}
+
+async function checkoutBooking(bookingId, button) {
+  if (!bookingId || !button) return;
+  if (!requestConfirmation(t("account.confirmCheckout"))) return;
+
+  button.disabled = true;
+  button.textContent = t("account.checkingOut");
+
+  try {
+    const response = await apiFetch(`/bookings/${encodeURIComponent(bookingId)}/checkout`, {
+      method: "PATCH",
+      returnStatuses: [400, 401, 403, 404, 405],
+      headers: {
+        ...authHeader(),
+      },
+    });
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      if ([401, 403].includes(response.status)) {
+        showToast("warning", t("account.checkoutForbidden"));
+        return;
+      }
+
+      showToast("error", formatApiError(data, t("account.checkoutFailed")));
+      return;
+    }
+
+    myBookings = myBookings.map((booking) =>
+      booking.id === String(bookingId)
+        ? { ...booking, status: "CheckedOut" }
+        : booking
+    );
+    renderBookingHistory();
+    showToast("success", data?.message || data?.Message || t("account.checkedOut"));
+  } catch (error) {
+    console.error("Checkout booking API error:", error);
+    showToast("error", t("account.checkoutFailed"));
+  } finally {
+    if (button.isConnected) {
+      button.disabled = false;
+      button.textContent = t("account.checkoutBooking");
     }
   }
 }
@@ -3165,6 +3241,12 @@ function setupAuthForms() {
     const paymentButton = event.target.closest("[data-complete-payment]");
     if (paymentButton) {
       completePayment(paymentButton.dataset.completePayment, paymentButton);
+      return;
+    }
+
+    const checkoutButton = event.target.closest("[data-checkout-booking]");
+    if (checkoutButton) {
+      checkoutBooking(checkoutButton.dataset.checkoutBooking, checkoutButton);
       return;
     }
 

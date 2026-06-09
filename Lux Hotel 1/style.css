@@ -1770,6 +1770,16 @@ select:focus {
     background: var(--gold-dark);
 }
 
+.booking-item-actions .checkout-action {
+    border-color: var(--success-line);
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.booking-item-actions .checkout-action:hover {
+    border-color: var(--success-text);
+}
+
 .booking-load-more {
     min-height: 42px;
     border: 1px solid var(--line);
